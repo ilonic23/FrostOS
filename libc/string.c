@@ -1,6 +1,7 @@
-#include "string.h"
+#include "./string.h"
 #include <stdint.h>
 #include "./stdlib.h"
+#include "./ctype.h"
 
 /**
  * K&R implementation
@@ -77,75 +78,149 @@ int strcmp(char s1[], char s2[]) {
     return s1[i] - s2[i];
 }
 
-void strfmt(const char *format, char *dest, uint64_t max, void **args) {
-    uint64_t written = 0;
-    uint8_t inFormat = 0;
-    uint16_t argIndex = 0;
+#define UINT64_MAX_VAL ((uint64_t)0xFFFFFFFFFFFFFFFFULL)
 
-    while (*format && written < max - 1) {
-        if (!inFormat) {
-            if (*format == '%') {
-                inFormat = 1;
-            } else {
-                dest[written++] = *format;
-            }
-        } else {
-            switch (*format) {
-                case '%':
-                    if (written < max - 1) dest[written++] = '%';
-                    break;
+uint64_t str_to_uint64(const char *s, uint8_t *error)
+{
+    *error = 1;
 
-                case 'c':
-                    if (written < max - 1) dest[written++] = *(char *)args[argIndex++];
-                    break;
+    if (!s) return 0;
 
-                case 's': {
-                    char *s = (char *)args[argIndex++];
-                    while (*s && written < max - 1)
-                        dest[written++] = *s++;
-                    break;
-                }
+    // Skip leading whitespace
+    while (isspace(*s)) s++;
 
-                case 'u': {
-                    uint32_t val = *(uint32_t *)args[argIndex++];
-                    char buffer[33];
-                    memset((uint8_t *)buffer, 0, 33);
-                    itoa(val, buffer, 10);
-                    char *s = buffer;
-                    while (*s && written < max - 1)
-                        dest[written++] = *s++;
-                    break;
-                }
+    if (!isdigit(*s)) return 0;   // empty or invalid
 
-                case 'x': {
-                    uint32_t val = *(uint32_t *)args[argIndex++];
-                    char buffer[33];
-                    memset((uint8_t *)buffer, 0, 33);
-                    itoa(val, buffer, 16);
-                    char *s = buffer;
-                    while (*s && written < max - 1)
-                        dest[written++] = *s++;
-                    break;
-                }
+    uint64_t result = 0;
+    while (isdigit(*s))
+    {
+        uint8_t digit = (uint8_t)(*s - '0');
 
-                default:
-                    // Если неизвестный формат, просто вставляем символ
-                    if (written < max - 1) dest[written++] = *format;
-                    break;
-            }
-            inFormat = 0;
-        }
-        format++;
+        // Overflow check: result * 10 + digit > UINT64_MAX
+        if (result > (UINT64_MAX_VAL - digit) / 10) return 0;
+
+        result = result * 10 + digit;
+        s++;
     }
 
-    dest[written] = '\0';
+    // Trailing garbage
+    while (isspace(*s)) s++;
+    if (*s != '\0') return 0;
+
+    *error = 0;
+    return result;
 }
 
-// uint64_t strlen(const char* str) {
-//     uint64_t len = 0;
-//     while (*str != '\0') {
-//         len++;
-//         str++;
-//     }
-//     return len;
-// }
+#define INT64_MAX_VAL ((int64_t)0x7FFFFFFFFFFFFFFFLL)
+#define INT64_MIN_VAL ((int64_t)(-INT64_MAX_VAL - 1))
+
+int64_t str_to_int64(const char *s, uint8_t *error)
+{
+    *error = 1;
+
+    if (!s) return 0;
+
+    while (isspace(*s)) s++;
+
+    int negative = 0;
+    if (*s == '-')      { negative = 1; s++; }
+    else if (*s == '+') { s++; }
+
+    if (!isdigit(*s)) return 0;
+
+    // Parse absolute value as uint64 to handle INT64_MIN cleanly
+    uint64_t result = 0;
+    uint64_t limit  = negative
+        ? (uint64_t)INT64_MAX_VAL + 1   // abs(INT64_MIN)
+        : (uint64_t)INT64_MAX_VAL;
+
+    while (isdigit(*s))
+    {
+        uint8_t digit = (uint8_t)(*s - '0');
+
+        if (result > (limit - digit) / 10) return 0;  // overflow
+
+        result = result * 10 + digit;
+        s++;
+    }
+
+    while (isspace(*s)) s++;
+    if (*s != '\0') return 0;
+
+    *error = 0;
+    return negative ? -(int64_t)result : (int64_t)result;
+}
+
+double str_to_double(const char *s, uint8_t *error)
+{
+    *error = 1;
+
+    if (!s) return 0.0;
+
+    while (isspace(*s)) s++;
+
+    int negative = 0;
+    if (*s == '-')      { negative = 1; s++; }
+    else if (*s == '+') { s++; }
+
+    // Must start with a digit or a lone '.' followed by a digit
+    if (!isdigit(*s) && (*s != '.' || !isdigit(*(s + 1)))) return 0.0;
+
+    // Integer part
+    double result = 0.0;
+    while (isdigit(*s))
+    {
+        result = result * 10.0 + (*s - '0');
+        s++;
+    }
+
+    // Fractional part
+    if (*s == '.')
+    {
+        s++;
+        double factor = 0.1;
+        while (isdigit(*s))
+        {
+            result += (*s - '0') * factor;
+            factor *= 0.1;
+            s++;
+        }
+    }
+
+    // Exponent part  (e / E)
+    if (*s == 'e' || *s == 'E')
+    {
+        s++;
+        int exp_negative = 0;
+        if (*s == '-')      { exp_negative = 1; s++; }
+        else if (*s == '+') { s++; }
+
+        if (!isdigit(*s)) return 0.0;   // 'e' with no digits
+
+        int exp = 0;
+        while (isdigit(*s))
+        {
+            exp = exp * 10 + (*s - '0');
+            if (exp > 9999) exp = 9999;  // clamp — avoids runaway loop
+            s++;
+        }
+
+        // Raise 10^exp by repeated squaring
+        double base  = 10.0;
+        double power = 1.0;
+        while (exp > 0)
+        {
+            if (exp & 1) power *= base;
+            base *= base;
+            exp >>= 1;
+        }
+
+        result = exp_negative ? result / power : result * power;
+    }
+
+    while (isspace(*s)) s++;
+    if (*s != '\0') return 0.0;
+
+    *error = 0;
+    return negative ? -result : result;
+}

@@ -5,7 +5,7 @@
 #include <stddef.h>
 
 void memcpy(uint8_t *source, uint8_t *dest, int nbytes);
-void memset(uint8_t *dest, uint8_t val, uint32_t len);
+void memset(void *dest, uint8_t val, uint32_t len);
 int memcmp(const void *buf1, const void *buf2, uint32_t count);
 void *memmove(void *dest, const void *src, size_t n);
 

@@ -97,7 +97,7 @@ void printf(const char *format, ...) {
             }
             // ---- %c ----
             else if (*format == 'c') {
-                char v = va_arg(args, char);
+                char v = va_arg(args, int);
                 kprint_char(v);
             }
             // ---- %s ----
@@ -214,7 +214,7 @@ int sprintf(char *s, const char *format, ...) {
             }
             // ---- %c ----
             else if (*format == 'c') {
-                char v = va_arg(args, char);
+                char v = va_arg(args, int);
                 *s++ = v;
             }
             // ---- %s ----

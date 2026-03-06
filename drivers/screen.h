@@ -47,6 +47,20 @@ enum VGABackgroundColors{
     WHITE_BG = 0xB0
 };
 
+enum BoxChars {
+    BoxCrnLeftUp = 0xC9,
+    BoxCrnRightUp = 0xBB,
+    BoxCrnLeftDown = 0xC8,
+    BoxCrnRightDown = 0xBC,
+    BoxLineVert = 0xBA,
+    BoxLineHorz = 0xCD,
+    BoxVer2HorzLeft = 0xB9,
+    BoxVer2HorzRight = 0xCC,
+    BoxHorz2VerUp = 0xCA,
+    BoxHorz2VerDown = 0xCB,
+    BoxCross = 0xCE
+};
+
 /* Screen i/o ports */
 #define REG_SCREEN_CTRL 0x3d4
 #define REG_SCREEN_DATA 0x3d5
@@ -59,5 +73,8 @@ void kprint(char *message);
 void kprint_char(char c);
 void kprint_attr(char *message, char attr);
 void kprint_backspace();
+int get_cursor_offset();
+void set_cursor_offset(int offset);
+int get_offset(int col, int row);
 
 #endif

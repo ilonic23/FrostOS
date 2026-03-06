@@ -10,7 +10,8 @@ int strlen(char s[]);
 void backspace(char s[]);
 void append(char s[], char n);
 int strcmp(char s1[], char s2[]);
-// char *itoa(int value, char *str, int base);
-void strfmt(const char *format, char *dest, uint64_t max, void **args);
+uint64_t str_to_uint64(const char *s, uint8_t *error);
+int64_t str_to_int64(const char *s, uint8_t *error);
+double str_to_double(const char *s, uint8_t *error);
 
 #endif

@@ -35,3 +35,13 @@ uint16_t port_word_in (uint16_t port) {
 void port_word_out (uint16_t port, uint16_t data) {
     asm volatile("out %%ax, %%dx" : : "a" (data), "d" (port));
 }
+
+uint32_t port_dword_in(uint16_t port) {
+    uint32_t result;
+    asm volatile("inl %1, %0" : "=a"(result) : "Nd"(port));
+    return result;
+}
+
+void port_dword_out(uint16_t port, uint32_t value) {
+    asm volatile("outl %0, %1" : : "a"(value), "Nd"(port));
+}
