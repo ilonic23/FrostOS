@@ -33,7 +33,7 @@ run: os-image.bin
 	qemu-system-i386 -m 512M -drive file=os-image.bin,format=raw,if=floppy -drive file=hdd.img,format=raw,if=ide -audiodev pa,id=speaker -machine pcspk-audiodev=speaker -enable-kvm -cpu host -vga std
 
 run-grub: kernel.elf
-	qemu-system-i386 -m 512M -kernel kernel.elf -drive file=hdd.img,format=raw,if=ide -audiodev pa,id=speaker -machine pcspk-audiodev=speaker -enable-kvm -cpu host -vga qxl
+	qemu-system-i386 -m 512M -kernel kernel.elf -drive file=hdd.img,format=raw,if=none,id=hd0 -device ich9-ahci,id=ahci -device ide-hd,drive=hd0,bus=ahci.0 -audiodev pa,id=speaker -machine pcspk-audiodev=speaker -enable-kvm -cpu host -vga qxl
 
 iso: kernel.elf
 	mkdir -p ./iso/boot/grub/
@@ -61,3 +61,5 @@ clean:
 	rm -rf *.bin *.dis *.o os-image.bin *.elf
 	rm -rf kernel/*.o boot/*.bin drivers/*.o boot/*.o cpu/*.o libc/*.o vm/*.o
 	rm -rf iso/
+#qemu-system-i386 -m 512M -kernel kernel.elf -drive file=hdd.img,format=raw,if=ide -audiodev pa,id=speaker -machine pcspk-audiodev=speaker -enable-kvm -cpu host -vga qxl
+	#qemu-system-i386 -m 512M -kernel kernel.elf -drive file=hdd.img,format=raw,if=none,id=hd0 -device ich9-ahci,id=ahci -device ide-hd,drive=hd0,bus=ahci.0 -audiodev pa,id=speaker -machine pcspk-audiodev=speaker -enable-kvm -cpu host -vga qxl
