@@ -1,0 +1,45 @@
+#include "ahci.h"
+#include <stdint.h>
+#include "pci.h"
+
+uint32_t ahci_get_bar5(uint8_t bus, uint8_t slot, uint8_t func) {
+    pci_standard_device_header_t ahci_ctrl_header = pci_get_standard_device_header(bus,
+            slot, func);
+    if (ahci_ctrl_header.base_header.vendor == 0xFFFF) return 0;
+
+    if (ahci_ctrl_header.base_header.class_code == 0x01 &&
+        ahci_ctrl_header.base_header.subclass == 0x06 &&
+        ahci_ctrl_header.base_header.progif == 0x01) {
+        return ahci_ctrl_header.bar5 & ~0x0FFFU; // clear flags from BAR5
+    }
+    return 0;
+}
+
+void ahci_init(volatile HBA_MEM *abar) {
+    // Take ownership from BIOS
+    if (abar->cap2 & 0x1) { // BOH bit: BIOS/OS handoff supported
+        abar->bohc |= (1<<1); // Set OSS (OS Ownership Semaphore)
+        while (abar->bohc & (1 << 0)) ; // Wait until BIOS releases BOS
+    }
+
+    // Enable AHCI
+    abar->ghc |= (1 << 31); // Set AHCI Enable
+
+    // Global Reset (clear all ports state)
+    abar->ghc |= (1 << 0); // Set HBA Reset
+    while (abar->ghc & (1 << 0)) ; // Wait for hw to clear
+
+    // Re-enable AHCI after reset
+    abar->ghc |= (1 << 31);
+
+    // Enable interrupts
+    abar->ghc |= (1 << 1); // IE bit
+
+    // Init each implemented port
+    uint32_t pi = abar->pi; // Ports implemented bitmask
+    for (int i = 0; i < 32; ++i) {
+        if (pi & (1 << i)) {
+            ahci_port_init(abar, i);
+        }
+    }
+}

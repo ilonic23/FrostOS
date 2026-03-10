@@ -13,6 +13,7 @@
 #include "multiboot.h"
 #include "../power/powerctl.h"
 #include "../drivers/pci.h"
+#include "../power/acpi.h"
 
 #include <stdint.h>
 
@@ -97,6 +98,9 @@ void kernel_main(uint32_t magic, uint32_t addr) {
             globals.kernel_name,
             globals.kernel_version);
     pci_scan_devs();
+
+    printf("RSDP ver: 0x%X\n", validate_rsdp(find_rsdp()));
+    printf("FADT: 0x%X\n", (uintptr_t)find_fadt(find_rsdp()));
 
     while (1) {
         kprint("\n> ");
@@ -204,7 +208,7 @@ void kernel_main(uint32_t magic, uint32_t addr) {
             while (1) {
                 uint8_t bus = (pci_devs[cur_index] >> 8) & 0xFF;
                 uint8_t slot = pci_devs[cur_index] & 0xFF;
-                pci_base_device_header_t header = pci_get_base_device_header(bus, slot);
+                pci_base_device_header_t header = pci_get_base_device_header(bus, slot, 0);
 
                 set_cursor_offset(get_offset(0, 3));
                 printf("%c", BoxCrnLeftUp);
@@ -386,6 +390,8 @@ void kernel_main(uint32_t magic, uint32_t addr) {
                 scancode = 0;
                 
             }
+        } else if (strcmp(buffer, "poweroff") == 0) {
+            poweroff();
         } else {
             kprint_attr("Unknown command: ", RED_FG);
             kprint_attr(buffer, RED_FG);

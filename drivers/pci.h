@@ -131,5 +131,6 @@ uint8_t pci_get_class_code(uint8_t bus, uint8_t slot);
 uint8_t pci_get_subclass(uint8_t bus, uint8_t slot);
 uint8_t pci_get_progif(uint8_t bus, uint8_t slot);
 uint8_t pci_get_revision(uint8_t bus, uint8_t slot);
-pci_base_device_header_t pci_get_base_device_header(uint8_t bus, uint8_t slot);
+pci_base_device_header_t pci_get_base_device_header(uint8_t bus, uint8_t slot, uint8_t func);
+pci_standard_device_header_t pci_get_standard_device_header(uint8_t bus, uint8_t slot, uint8_t func);
 #endif

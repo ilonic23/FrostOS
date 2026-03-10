@@ -68,15 +68,26 @@ uint8_t pci_get_revision(uint8_t bus, uint8_t slot) {
     return (uint8_t)(pci_config_read_word(bus, slot, 0, 8) & 0xFF);
 }
 
-pci_base_device_header_t pci_get_base_device_header(uint8_t bus, uint8_t slot) {
+pci_base_device_header_t pci_get_base_device_header(uint8_t bus, uint8_t slot, uint8_t func) {
     if (pci_get_vendor(bus, slot) == 0xFFFF)
         return (pci_base_device_header_t){.vendor = 0xFFFF};
 
     uint32_t result[4];
-    result[0] = pci_config_read_dword(bus, slot, 0, 0x0);
-    result[1] = pci_config_read_dword(bus, slot, 0, 0x4);
-    result[2] = pci_config_read_dword(bus, slot, 0, 0x8);
-    result[3] = pci_config_read_dword(bus, slot, 0, 0xC);
+    result[0] = pci_config_read_dword(bus, slot, func, 0x0);
+    result[1] = pci_config_read_dword(bus, slot, func, 0x4);
+    result[2] = pci_config_read_dword(bus, slot, func, 0x8);
+    result[3] = pci_config_read_dword(bus, slot, func, 0xC);
 
     return *(pci_base_device_header_t *)result;
+}
+
+pci_standard_device_header_t pci_get_standard_device_header(uint8_t bus, uint8_t slot, uint8_t func) {
+    if (pci_get_vendor(bus, slot) == 0xFFFF)
+        return (pci_standard_device_header_t){.base_header.vendor = 0xFFFF};
+
+    uint32_t result[sizeof(pci_standard_device_header_t)/4];
+    for (int i = 0; i < sizeof(pci_standard_device_header_t); i+=4)
+        result[i/4] = pci_config_read_dword(bus, slot, func, i);
+
+    return *(pci_standard_device_header_t *)result;
 }

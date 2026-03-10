@@ -1,5 +1,7 @@
 #include "powerctl.h"
+#include "acpi.h"
 #include "../cpu/ports.h"
+#include "../libc/stdio.h"
 
 void halt() {
 loop:
@@ -47,3 +49,21 @@ loop:
 }
 
 // -----------------------------------------------------------------------------
+
+void poweroff() {
+    rsdp_t *rsdp = find_rsdp();
+    if (!rsdp) halt();
+
+    fadt_t *fadt = find_fadt(rsdp);
+    if (!fadt) halt();
+
+    acpi_enable(fadt);
+
+    if (!parse_slp_from_dsdt(fadt)) halt();
+
+    acpi_shutdown(fadt);
+
+    // We shall not be here
+    printf("[[Hyperlink Blocked]]\n");
+    halt();
+}
