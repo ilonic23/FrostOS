@@ -3,7 +3,7 @@
 
 void render_glyph(unsigned char *glyph) {
     for (int row = 0; row < 8; row++) {
-        unsigned char byte = glyph[row]; // one byte per row (6px + 2 padding bits)
+        unsigned char byte = glyph[row];
 
         for (int col = 0; col < 8; col++) {
             int bit = (byte >> (7 - col)) & 1;
