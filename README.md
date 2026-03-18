@@ -24,3 +24,13 @@ A hobby OS made for self-learning.
 ## Target:
 - Make it work on real hardware. (It is already, just be sure every release works)
 - More soon ;)
+
+## Building an ISO:
+```sh
+make iso
+```
+
+## Running in QEMU:
+```sh
+make run-grub
+```
