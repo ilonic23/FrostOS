@@ -1,8 +1,7 @@
 #include "isr.h"
 #include "idt.h"
-#include "../drivers/screen.h"
 #include "../drivers/keyboard.h"
-#include "../libc/string.h"
+#include "isr99.h"
 #include "timer.h"
 #include "ports.h"
 #include "rtc.h"
@@ -44,6 +43,7 @@ void isr_install() {
     set_idt_gate(29, (uint32_t)isr29);
     set_idt_gate(30, (uint32_t)isr30);
     set_idt_gate(31, (uint32_t)isr31);
+    set_idt_gate(153, (uint32_t)isr99);
 
     // Remap the PIC
     port_byte_out(0x20, 0x11);
@@ -118,13 +118,20 @@ char *exception_messages[] = {
 };
 
 void isr_handler(registers_t *r) {
-    kprint("received interrupt: ");
+    /*display_print_str("Received interrupt: ");
     char s[3];
     int_to_ascii(r->int_no, s);
-    kprint(s);
-    kprint("\n");
-    kprint(exception_messages[r->int_no]);
-    kprint("\n");
+    display_print_str(s);
+    display_print_str("\n");
+    display_print_str(exception_messages[r->int_no]);
+    display_print_str("\n");*/
+
+    // Handle ISRs like IRQs
+    if (interrupt_handlers[r->int_no] != 0
+        && (r->int_no < IRQ0 || r->int_no > IRQ15)) {
+            isr_t handler = interrupt_handlers[r->int_no];
+            handler(r);
+    }
 }
 
 void register_interrupt_handler(uint8_t n, isr_t handler) {
@@ -152,5 +159,5 @@ void irq_install() {
     /* IRQ1: keyboard */
     init_keyboard();
     init_rtc(0x06);
-    
+    install_isr99();
 }
