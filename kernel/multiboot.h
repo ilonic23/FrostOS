@@ -64,8 +64,20 @@ typedef struct __attribute__((packed)) {
     uint8_t  framebuffer_blue_mask_size;
 } multiboot_info_t;
 
+typedef struct __attribute__((packed)) {
+    uint32_t size;
+    uint64_t addr;
+    uint64_t len;
+#define MULTIBOOT_MEMORY_AVAILABLE 1
+#define MULTIBOOT_MEMORY_RESERVED 2
+#define MULTIBOOT_MEMORY_ACPI_RECLAIMABLE 3
+#define MULTIBOOT_MEMORY_NVS = 4
+#define MULTIBOOT_MEMORY_BADRAM = 5
+    uint32_t type;
+} multiboot_mmap_entry_t;
+
 char *mb_get_bootloader(multiboot_info_t *mbi);
 uint64_t mb_get_lower_mem(multiboot_info_t *mbi);
 uint64_t mb_get_upper_mem(multiboot_info_t *mbi);
-
+uint64_t mb_get_mem(multiboot_info_t *mbi);
 #endif
