@@ -71,8 +71,8 @@ typedef struct __attribute__((packed)) {
 #define MULTIBOOT_MEMORY_AVAILABLE 1
 #define MULTIBOOT_MEMORY_RESERVED 2
 #define MULTIBOOT_MEMORY_ACPI_RECLAIMABLE 3
-#define MULTIBOOT_MEMORY_NVS = 4
-#define MULTIBOOT_MEMORY_BADRAM = 5
+#define MULTIBOOT_MEMORY_NVS 4
+#define MULTIBOOT_MEMORY_BADRAM 5
     uint32_t type;
 } multiboot_mmap_entry_t;
 
