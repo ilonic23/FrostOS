@@ -4,7 +4,7 @@ pkgs.mkShell {
   # List the packages required for your development environment
   packages = with pkgs; [
     tinyxxd
-    # qemu_full
+    qemu_kvm
 	gnumake
 	gdb
 	coreboot-toolchain.i386
