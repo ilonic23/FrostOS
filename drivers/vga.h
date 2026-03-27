@@ -18,7 +18,7 @@ void vga_print_attr(char *str, char attr);
 void vga_print_backspace();
 int  vga_get_cursor_offset();
 void vga_set_cursor_offset(int offset);
-int  vga_col_row_to_offset(int col, int row);
+int  vga_get_offset(int col, int row);
 
 enum {
     BLACK_FG = 0x00,

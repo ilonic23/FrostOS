@@ -14,7 +14,7 @@ void vga_print_at(char *str, int col, int row) {
 void vga_print_at_attr(char *str, int col, int row, char attr) {
     int offset;
     if (col >= 0 && row >= 0)
-        offset = vga_col_row_to_offset(col, row);
+        offset = vga_get_offset(col, row);
     else {
         offset = vga_get_cursor_offset();
         row = get_offset_row(offset);
@@ -65,25 +65,25 @@ void vga_set_cursor_offset(int offset) {
     port_byte_out(VGA_REG_SCREEN_DATA, (uint8_t)(offset & 0xff));
 }
 
-int vga_col_row_to_offset(int col, int row) { return 2 * (row * VGA_MAX_COLS + col); }
+int vga_get_offset(int col, int row) { return 2 * (row * VGA_MAX_COLS + col); }
 
 static int print_char(char c, int col, int row, char attr) {
     uint8_t *screen = (uint8_t *)VGA_VID_ADDR;
     if (!attr) attr = BLACK_BG | WHITE_FG;
 
-    if (col >= VGA_MAX_ROWS || row >= VGA_MAX_ROWS) {
-        screen[2*VGA_MAX_COLS*VGA_MAX_ROWS-2] = 'E';
-        screen[2*VGA_MAX_COLS*VGA_MAX_ROWS-1] = BLACK_BG | RED_FG;
-        return vga_col_row_to_offset(col, row);
+    if (col >= VGA_MAX_COLS || row >= VGA_MAX_ROWS) {
+        screen[2*(VGA_MAX_COLS)*(VGA_MAX_ROWS)-2] = 'E';
+        screen[2*(VGA_MAX_COLS)*(VGA_MAX_ROWS)-1] = BLACK_BG | RED_FG;
+        return vga_get_offset(col, row);
     }
 
     int offset;
-    if (col >= 0 && row >= 0) offset = vga_col_row_to_offset(col, row);
+    if (col >= 0 && row >= 0) offset = vga_get_offset(col, row);
     else offset = vga_get_cursor_offset();
 
     if (c == '\n') {
         row = get_offset_row(offset);
-        offset = vga_col_row_to_offset(col, row);
+        offset = vga_get_offset(0, row+1);
     } else if (c == 0x08 || c == '\b') {
         screen[offset-2] = ' ';
         screen[offset-1] = attr;
@@ -97,10 +97,11 @@ static int print_char(char c, int col, int row, char attr) {
     // Check if the offset is over screen size and roll
     if (offset >= VGA_MAX_ROWS * VGA_MAX_COLS * 2) {
         for (int i = 1; i < VGA_MAX_ROWS; ++i)
-            memcpy((uint8_t*)(vga_col_row_to_offset(0, i) + VGA_VID_ADDR),
-                        (uint8_t*)(vga_col_row_to_offset(0, i-1) + VGA_VID_ADDR),
-                        VGA_MAX_COLS * 2);
-        char *last_line = (char *)(vga_col_row_to_offset(0, VGA_MAX_ROWS-1)
+            memcpy((uint8_t *)(vga_get_offset(0, i) + VGA_VID_ADDR),
+                     (uint8_t *)(vga_get_offset(0, i-1) + VGA_VID_ADDR),
+                   VGA_MAX_COLS * 2);
+
+        char *last_line = (char *)(vga_get_offset(0, VGA_MAX_ROWS-1)
                 + (uint8_t *)VGA_VID_ADDR);
 
         for (int i = 0; i < VGA_MAX_COLS *2; ++i) last_line[i] = 0;
@@ -118,7 +119,7 @@ void vga_clear_screen() {
         screen[i*2] = ' ';
         screen[i*2+1] = BLACK_BG | WHITE_FG;
     }
-    vga_set_cursor_offset(vga_col_row_to_offset(0, 0));
+    vga_set_cursor_offset(vga_get_offset(0, 0));
 }
 
 int get_offset_row(int offset) { return offset / (2 * VGA_MAX_COLS); }
