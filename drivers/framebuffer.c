@@ -1,6 +1,5 @@
 #include "framebuffer.h"
 #include <stdint.h>
-#include "../libc/mem.h"
 
 int framebuffer_supported(multiboot_info_t *mbi) {
     return (mbi->flags & (1u << 12)) != 0;
@@ -37,19 +36,34 @@ void framebuffer_put_pixel(framebuffer_info *info, uint32_t x, uint32_t y, uint3
 
 void framebuffer_fill_rect(framebuffer_info *info, uint32_t x, uint32_t y, uint32_t width,
         uint32_t height, uint32_t color) {
-    for (int x_new = x; x_new + x < width; ++x_new)
-        for (int y_new = y; y_new + y < height; ++y_new)
+    for (uint32_t x_new = x; x_new < width + x; ++x_new)
+        for (uint32_t y_new = y; y_new < height + y; ++y_new)
             framebuffer_put_pixel(info, x_new, y_new, color);
 }
 
 void framebuffer_clear_screen(framebuffer_info *info, uint32_t color) {
     // If no row padding
     if (info->pitch == info->width * 4) {
-        uint32_t *fb  = (uint32_t*)info->addr;
+        uint32_t *fb  = (uint32_t*)(uintptr_t)info->addr;
         uint32_t  len = info->width * info->height;
         for (uint32_t i = 0; i < len; i++)
             fb[i] = color;
     } else {
         framebuffer_fill_rect(info, 0, 0, info->width, info->height, color);
+    }
+}
+
+void framebuffer_put_char(framebuffer_info *info, uint8_t *font, size_t char_index,
+        uint32_t char_width, uint32_t char_height,
+        uint32_t x, uint32_t y, uint32_t color_fg, uint32_t color_bg) {
+    uint8_t (*fnt)[char_width] = (uint8_t (*)[char_width])font;
+    for (uint32_t row = 0; row < char_height; row++) {
+        unsigned char byte = fnt[char_index][row];
+        for (uint32_t col = 0; col < char_width; col++) {
+            int bit = (byte >> (7 - col)) & 1;
+            int px = x + col;
+            int py = y + row;
+            framebuffer_put_pixel(info, px, py, bit ? color_fg : color_bg);
+        }
     }
 }
