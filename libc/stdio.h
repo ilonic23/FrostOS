@@ -6,9 +6,7 @@ FrostOS implementation of stdio.h
 #define STDIO_H
 
 #include <stdint.h>
-
-#define NULL ((void*)0)
-#define EOF -1
+#include <stddef.h>
 
 int sprintf(char *s, const char *format, ...);
 void printf(const char *format, ...);

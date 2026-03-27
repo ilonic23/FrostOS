@@ -4,7 +4,7 @@
 
 char *mb_get_bootloader(multiboot_info_t *mbi) {
     if (mbi->flags & (1u << 9))
-        return (char *)mbi->boot_loader_name;
+        return (char *)(uintptr_t)mbi->boot_loader_name;
     return NULL;
 }
 
@@ -26,9 +26,9 @@ uint64_t mb_get_upper_mem(multiboot_info_t *mbi) {
 uint64_t mb_get_mem(multiboot_info_t *mbi) {
     uint64_t result = 0;
     if (mbi->flags & (1u << 6))
-        for (int i = 0; i < mbi->mmap_length; i += sizeof(multiboot_mmap_entry_t)) {
+        for (uint32_t i = 0; i < mbi->mmap_length; i += sizeof(multiboot_mmap_entry_t)) {
             multiboot_mmap_entry_t entry =
-                *(multiboot_mmap_entry_t*)(mbi->mmap_addr + i);
+                *(multiboot_mmap_entry_t*)(uintptr_t)(mbi->mmap_addr + i);
             result += entry.len;
         }
     return result;
