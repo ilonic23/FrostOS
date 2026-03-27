@@ -1,5 +1,4 @@
 #include <stdint.h>
-#include "../drivers/screen.h"
 #include "../libc/mem.h"
 #include "../libc/stdio.h"
 

@@ -1,15 +1,13 @@
 #include "../cpu/ports.h"
 #include "../cpu/isr.h"
 #include <stdint.h>
-#include "screen.h"
+#include "display/display.h"
 
 static uint8_t cur_scancode = 0;
 static uint8_t shift_pressed = 0;
 
 uint8_t get_cur_scancode() {
-    uint8_t temp = cur_scancode;
-    cur_scancode = 0;
-    return temp;
+    return cur_scancode;
 }
 
 // Non-Shifted keys
@@ -56,7 +54,6 @@ char keyboard_receive_key(char halt)
 
 void getline(char *to, char echo, uint32_t max_len) {
     char key = 0;
-    char temp[2];
     char *start = to;
 
     while (1) {
@@ -69,13 +66,11 @@ void getline(char *to, char echo, uint32_t max_len) {
         if ((uint32_t)(to - start) < max_len - 1) {
             *to++ = key;
             if (key == '\b') {
-            	*to--;
-            	*to--;
+            	to--;
+            	to--;
             }
             if (echo) {
-                temp[0] = key;
-                temp[1] = '\0';
-                kprint(temp);
+                display_print_char_ez(key);
             }
         }
     }

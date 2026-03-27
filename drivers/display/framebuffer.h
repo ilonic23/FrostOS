@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
-#include "../multiboot/multiboot.h"
+#include "../../multiboot/multiboot.h"
 
 /* TODO:
  * 1. Put pixel - Done

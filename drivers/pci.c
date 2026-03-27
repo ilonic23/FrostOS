@@ -86,7 +86,7 @@ pci_standard_device_header_t pci_get_standard_device_header(uint8_t bus, uint8_t
         return (pci_standard_device_header_t){.base_header.vendor = 0xFFFF};
 
     uint32_t result[sizeof(pci_standard_device_header_t)/4];
-    for (int i = 0; i < sizeof(pci_standard_device_header_t); i+=4)
+    for (uint32_t i = 0; i < sizeof(pci_standard_device_header_t); i+=4)
         result[i/4] = pci_config_read_dword(bus, slot, func, i);
 
     return *(pci_standard_device_header_t *)result;
