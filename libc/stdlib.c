@@ -88,22 +88,17 @@ void rlimit(char *src, uint32_t n, char a) {
 char *ftoa(double value, char *str, int base, int precision)
 {
     char *p = str;
-
-    // Обработка знака
     if (value < 0) {
         *p++ = '-';
         value = -value;
     }
 
-    // Целая часть
     int int_part = (int)value;
     double frac_part = value - (double)int_part;
 
-    // Преобразуем целую часть
     char int_buf[32];
     itoa(int_part, int_buf, base);
 
-    // Копируем целую часть
     char *t = int_buf;
     while (*t) *p++ = *t++;
 

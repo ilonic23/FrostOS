@@ -1,5 +1,5 @@
-C_SOURCES = $(wildcard kernel/*.c drivers/*.c cpu/*.c libc/*.c power/*.c)
-HEADERS = $(wildcard kernel/*.h drivers/*.h cpu/*.h libc/*.h power/*.h)
+C_SOURCES = $(wildcard kernel/*.c drivers/*.c cpu/*.c libc/*.c power/*.c drivers/display/*.c multiboot/*.c)
+HEADERS = $(wildcard kernel/*.h drivers/*.h cpu/*.h libc/*.h power/*.h drivers/display/*.h multiboot/*.h)
 OBJ = ${C_SOURCES:.c=.o cpu/interrupt.o drivers/cpuid-detect.o }
 CC = i386-elf-gcc
 GDB = gdb
@@ -61,5 +61,6 @@ clean:
 	rm -rf *.bin *.dis *.o os-image.bin *.elf
 	rm -rf kernel/*.o boot/*.bin drivers/*.o boot/*.o cpu/*.o libc/*.o vm/*.o
 	rm -rf iso/
+
 #qemu-system-i386 -m 512M -kernel kernel.elf -drive file=hdd.img,format=raw,if=ide -audiodev pa,id=speaker -machine pcspk-audiodev=speaker -enable-kvm -cpu host -vga qxl
 	#qemu-system-i386 -m 512M -kernel kernel.elf -drive file=hdd.img,format=raw,if=none,id=hd0 -device ich9-ahci,id=ahci -device ide-hd,drive=hd0,bus=ahci.0 -audiodev pa,id=speaker -machine pcspk-audiodev=speaker -enable-kvm -cpu host -vga qxl

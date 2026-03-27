@@ -1,7 +1,7 @@
 #include "vga.h"
 #include <stdint.h>
-#include "../libc/mem.h"
-#include "../cpu/ports.h"
+#include "../../libc/mem.h"
+#include "../../cpu/ports.h"
 
 int get_offset_row(int offset);
 int get_offset_col(int offset);

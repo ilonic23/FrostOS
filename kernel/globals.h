@@ -1,5 +1,5 @@
 #include <stdint.h>
-#include "multiboot.h"
+#include "../multiboot/multiboot.h"
 #include "../drivers/clock.h"
 
 typedef struct {
