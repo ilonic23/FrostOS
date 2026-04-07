@@ -25,6 +25,7 @@ typedef struct __attribute__((packed)) {
 } snowfs_file_entry_t;
 
 typedef struct __attribute__((packed)) {
+    uint32_t magic;
     uint8_t volume_label[16];
     uint16_t sectors_for_files;
 } snowfs_superblock_t;
