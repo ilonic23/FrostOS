@@ -24,6 +24,11 @@
 #define DRIVE_ADDR_REG 0x1
 
 #define IDENTIFY 0xEC
+#define READ_SECTS 0x20
+#define READ_SECTS_EX 0x24
+#define WRITE_SECTS 0x30
+
+#define CACHE_FLUSH 0xE7
 
 static uint16_t identify_vals[256];
 
@@ -131,5 +136,85 @@ uint64_t ata_get_lba48_sects() {
                           (uint64_t)identify_vals[101] << 16 |
                           identify_vals[100];
     }
+    return 0;
+}
+
+int ata_lba28_read(uint32_t lba, uint8_t count, uint16_t *buffer) {
+    uint32_t total_sects = ata_get_lba28_sects();
+    if (lba > total_sects)
+        return 0;
+    if ((lba + count) > total_sects)
+        return 0;
+
+    port_byte_out(PRIMARY_IO_BASE + DRV_HEAD_REG, 0xE0 | ((lba >> 24) & 0x0F));
+
+    port_byte_out(PRIMARY_IO_BASE + SECT_CNT_REG, count);
+
+    port_byte_out(PRIMARY_IO_BASE + LBA_LO_REG, (lba >> 0) & 0xFF);
+    port_byte_out(PRIMARY_IO_BASE + LBA_MID_REG, (lba >> 8) & 0xFF);
+    port_byte_out(PRIMARY_IO_BASE + LBA_HI_REG, (lba >> 16) & 0xFF);
+
+    port_byte_out(PRIMARY_IO_BASE + CMD_REG, READ_SECTS);
+
+    for (int i = 0; i < count; ++i) {
+        uint8_t status;
+        while (1) {
+            status = port_byte_in(PRIMARY_IO_BASE + STATUS_REG);
+            if (status & (1u << 0))
+                return 0;
+            if (status & (1u << 7))
+                continue;
+            if (status & (1u << 3))
+                break;
+        }
+
+        for (int j = 0; j < 256; ++j)
+            *buffer++ = port_word_in(PRIMARY_IO_BASE + DATA_REG);
+        ata_400ns_delay();
+    }
+
+    return 0;
+}
+
+void ata_cache_flush() {
+    port_byte_out(PRIMARY_IO_BASE + CMD_REG, CACHE_FLUSH);
+    while (port_byte_in(PRIMARY_IO_BASE + STATUS_REG) & (1u << 7))
+        ;
+}
+
+int ata_lba28_write(uint32_t lba, uint8_t count, uint16_t *buffer) {
+    uint32_t total_sects = ata_get_lba28_sects();
+    if (lba > total_sects)
+        return 0;
+    if ((lba + count) > total_sects)
+        return 0;
+
+    port_byte_out(PRIMARY_IO_BASE + DRV_HEAD_REG, 0xE0 | ((lba >> 24) & 0x0F));
+
+    port_byte_out(PRIMARY_IO_BASE + SECT_CNT_REG, count);
+
+    port_byte_out(PRIMARY_IO_BASE + LBA_LO_REG, (lba >> 0) & 0xFF);
+    port_byte_out(PRIMARY_IO_BASE + LBA_MID_REG, (lba >> 8) & 0xFF);
+    port_byte_out(PRIMARY_IO_BASE + LBA_HI_REG, (lba >> 16) & 0xFF);
+
+    port_byte_out(PRIMARY_IO_BASE + CMD_REG, WRITE_SECTS);
+
+    for (int i = 0; i < count; ++i) {
+        uint8_t status;
+        while (1) {
+            status = port_byte_in(PRIMARY_IO_BASE + STATUS_REG);
+            if (status & (1u << 0))
+                return 0;
+            if (status & (1u << 7))
+                continue;
+            if (status & (1u << 3))
+                break;
+        }
+
+        for (int j = 0; j < 256; ++j)
+            port_word_out(PRIMARY_IO_BASE + DATA_REG, *buffer++);
+        ata_400ns_delay();
+    }
+    ata_cache_flush();
     return 0;
 }
