@@ -2,6 +2,7 @@
 #include <stdint.h>
 
 #include "../cpu/timer.h"
+#include "../drivers/pcspk.h"
 #include "../power/powerctl.h"
 #include "kernel.h"
 
@@ -34,4 +35,25 @@ void kercall_powerctl_reboot(registers_t *regs) {
 void kercall_powerctl_halt(registers_t *regs) {
     (void)regs;
     halt();
+}
+
+// --- PC Speaker functions ---
+
+void kercall_pcspk_beep(registers_t *regs) {
+    (void)regs;
+    speaker_beep();
+}
+
+void kercall_pcspk_set_freq(registers_t *regs) {
+    speaker_set_frequency(regs->ebx);
+}
+
+uint32_t kercall_pcspk_get_freq(registers_t *regs) {
+    (void)regs;
+    return speaker_get_freq();
+}
+
+void kercall_pcspk_stop(registers_t *regs) {
+    (void)regs;
+    speaker_stop();
 }

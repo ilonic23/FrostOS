@@ -27,6 +27,19 @@ void callback(registers_t *regs) {
     case 3004:
         kercall_powerctl_halt(regs);
         break;
+    case 3005:
+        kercall_pcspk_beep(regs);
+        break;
+    case 3006:
+        kercall_pcspk_set_freq(regs);
+        break;
+    case 3007:
+        kercall_pcspk_stop(regs);
+        break;
+    case 3008: {
+        uint32_t freq = kercall_pcspk_get_freq(regs);
+        regs->eax = freq;
+    } break;
     }
 }
 
