@@ -13,10 +13,10 @@ HBA_MEM *ahci_get_abar(uint8_t bus, uint8_t slot, uint8_t func) {
     if (ahci_ctrl_header.base_header.class_code == 0x01 &&
         ahci_ctrl_header.base_header.subclass == 0x06 &&
         ahci_ctrl_header.base_header.progif == 0x01) {
-        uint16_t cmd = pci_config_read_word(bus, slot, func, 0x04);
+        /*uint16_t cmd = pci_config_read_word(bus, slot, func, 0x04);
         cmd |= (1 << 1); // Enable Memory Space
         cmd |= (1 << 2); // Enable Bus Mastering
-        pci_config_write_word(bus, slot, func, 0x04, cmd);
+        pci_config_write_word(bus, slot, func, 0x04, cmd);*/
         HBA_MEM *abar =
             (HBA_MEM *)(uintptr_t)(ahci_ctrl_header.bar5 &
                                    ~0x0FFFU); // clear flags from BAR5
