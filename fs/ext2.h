@@ -60,7 +60,7 @@ typedef struct __attribute__((packed)) {
     uint32_t journal_inode;
     uint32_t journal_device;
     uint32_t orphan_inode_list_head; // Head of orphan inode list
-    // 236-1023 Unused, but for memory economy we'll not write it here
+    uint8_t unused2[872];
 } ext2_superblock_ex_t;
 
 typedef struct __attribute__((packed)) {
@@ -71,6 +71,38 @@ typedef struct __attribute__((packed)) {
     uint16_t unallocated_inodes_in_group;
     uint16_t dirs_in_group;
     uint8_t unused[14];
-} block_group_descriptor;
+} ext2_block_group_descriptor_t;
+
+typedef struct __attribute__((packed)) {
+    uint16_t type_perm;
+    uint16_t uid;
+    uint32_t size_low;
+    uint32_t access_time;
+    uint32_t creation_time;
+    uint32_t modification_time;
+    uint32_t deletion_time;
+    uint16_t gid;
+    uint16_t hard_links_count;
+    uint32_t used_sects;
+    uint32_t flags;
+    uint32_t osspec1;
+    uint32_t direct_block_ptrs[12];
+    uint32_t indirect_block_ptr;
+    uint32_t doubly_indirect_block_ptr;
+    uint32_t triply_indirect_block_ptr;
+    uint32_t generation_num;
+    uint32_t file_acl;
+    uint32_t size_hi; // or dir acl
+    uint32_t block_addr_fragment;
+    uint8_t osspec2[12];
+} ext2_inode_t;
+
+typedef struct __attribute__((packed)) {
+    uint32_t inode;
+    uint16_t total_size;
+    uint8_t name_len;
+    uint8_t type;
+    char name[];
+} ext2_dir_entry_t;
 
 #endif
