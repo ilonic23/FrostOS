@@ -3,6 +3,13 @@
 
 #include <stdint.h>
 
+typedef struct {
+    uint16_t io_base;
+    uint16_t ct_base;
+    uint8_t flags; // 0 - slave, 1 - ata, 2 - atapi, 3 - sata
+    uint16_t identify_vals[10];
+} ata_drive_t;
+
 int ata_identify();
 uint32_t ata_get_lba28_sects();
 uint64_t ata_get_lba48_sects();

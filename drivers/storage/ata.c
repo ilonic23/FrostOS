@@ -173,7 +173,7 @@ int ata_lba28_read(uint32_t lba, uint8_t count, uint16_t *buffer) {
         ata_400ns_delay();
     }
 
-    return 0;
+    return 1;
 }
 
 void ata_cache_flush() {
@@ -216,5 +216,5 @@ int ata_lba28_write(uint32_t lba, uint8_t count, uint16_t *buffer) {
         ata_400ns_delay();
     }
     ata_cache_flush();
-    return 0;
+    return 1;
 }
