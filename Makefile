@@ -1,5 +1,5 @@
-C_SOURCES = $(wildcard kernel/*.c drivers/*.c cpu/*.c libc/*.c power/*.c drivers/display/*.c multiboot/*.c)
-HEADERS = $(wildcard kernel/*.h drivers/*.h cpu/*.h libc/*.h power/*.h drivers/display/*.h multiboot/*.h)
+C_SOURCES = $(wildcard kernel/*.c drivers/*.c cpu/*.c libc/*.c power/*.c drivers/display/*.c multiboot/*.c drivers/storage/*.c)
+HEADERS = $(wildcard kernel/*.h drivers/*.h cpu/*.h libc/*.h power/*.h drivers/display/*.h multiboot/*.h drivers/storage/*.h)
 OBJ = ${C_SOURCES:.c=.o cpu/interrupt.o drivers/cpuid-detect.o }
 CC = i386-elf-gcc
 GDB = gdb
@@ -11,16 +11,6 @@ kernel.elf: boot/multiboot_entry.o ${OBJ}
 kernel.bin: boot/kernel_entry.o ${OBJ}
 	i386-elf-ld -o $@ -Ttext 0x1000 $^ --oformat binary
 
-#MADE FOR LOCAL USE, I AM NOT RESPONSIBLE IF SOMETHING HAPPENS
-#usb: kernel.elf
-#	sudo mkdir -p /mnt/usb
-#	sudo mount /dev/sdd1 /mnt/usb
-#	sudo mkdir -p /mnt/usb/boot/grub
-#	sudo cp kernel.elf /mnt/usb/boot/kernel.bin
-#	sudo cp grub.cfg /mnt/usb/boot/grub/
-#	sudo umount /mnt/usb
-#	@echo "USB ready! Boot from it now."
-
 os-image.bin: temp-image.bin
 	dd if=/dev/zero of=$@ bs=1M count=4
 	dd if=temp-image.bin of=$@ conv=notrunc
@@ -29,17 +19,17 @@ os-image.bin: temp-image.bin
 temp-image.bin: boot/bootsect.bin kernel.bin
 	cat $^ > temp-image.bin
 
-run: os-image.bin
-	qemu-system-i386 -m 512M -drive file=os-image.bin,format=raw,if=floppy -drive file=hdd.img,format=raw,if=ide -audiodev pa,id=speaker -machine pcspk-audiodev=speaker -enable-kvm -cpu host -vga std
-
-run-grub: kernel.elf
-	qemu-system-i386 -m 512M -kernel kernel.elf -drive file=hdd.img,format=raw,if=none,id=hd0 -device ich9-ahci,id=ahci -device ide-hd,drive=hd0,bus=ahci.0 -audiodev pa,id=speaker -machine pcspk-audiodev=speaker -enable-kvm -cpu host -vga qxl
-
-iso: kernel.elf
+FrostOS.iso: kernel.elf
 	mkdir -p ./iso/boot/grub/
 	cp ./grub.cfg ./iso/boot/grub/grub.cfg
 	cp ./kernel.elf ./iso/boot/kernel.bin
 	grub-mkrescue -o FrostOS.iso iso/
+
+run: kernel.elf
+	qemu-system-i386 -m 512M -kernel kernel.elf -drive file=hdd.img,format=raw,if=none,id=hd0 -device ich9-ahci,id=ahci -device ide-hd,drive=hd0,bus=ahci.0 -audiodev pa,id=speaker -machine pcspk-audiodev=speaker -enable-kvm -cpu host -vga qxl
+
+run-grub: FrostOS.iso
+	qemu-system-i386 -m 512M -boot once=d -cdrom FrostOS.iso -drive file=hdd4.img,format=raw,index=0,media=disk,if=ide -audiodev pa,id=speaker -machine pcspk-audiodev=speaker -enable-kvm -cpu host -vga qxl
 
 debug: os-image.bin kernel.elf
 	qemu-system-i386 -S -s -m 512M -fda os-image.bin -hda hdd.img -audiodev pa,id=speaker -machine pcspk-audiodev=speaker -d guest_errors,int &
