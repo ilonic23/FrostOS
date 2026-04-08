@@ -1,20 +1,33 @@
+#ifndef DRIVE_H
+#define DRIVE_H
+
 #include "ahci.h"
+#include "ata.h"
 #include <stdint.h>
 
 typedef enum {
-    DISK_NULL = 0,
-    DISK_AHCI_DEV_NULL = 0,
-    DISK_AHCI_DEV_SATA,
-    DISK_AHCI_DEV_SEMB,
-    DISK_AHCI_DEV_PM,
-    DISK_AHCI_DEV_SATAPI,
-} disk_type_t;
+    DRIVE_NULL = 0,
+    DRIVE_AHCI_DEV_NULL,
+    DRIVE_AHCI_DEV_SATA,
+    DRIVE_AHCI_DEV_SEMB,
+    DRIVE_AHCI_DEV_PM,
+    DRIVE_AHCI_DEV_SATAPI,
+    DRIVE_ATA,
+    DRIVE_ATA_ATAPI,
+    DRIVE_ATA_SATA
+} drive_type_t;
 
 typedef struct {
-    disk_type_t type;
-    // If in future NVMe will be added, then
-    // it won't depend on AHCI implementation.
+    drive_type_t type;
     union {
         HBA_PORT *ahci_hba_port;
+        ata_drive_t *ata_drive;
     } control;
-} disk_entry_t;
+} drive_entry_t;
+
+drive_entry_t drive_ata_init(ata_drive_t *drive);
+int drive_lba28_read(drive_entry_t *drive, uint32_t lba, uint8_t count,
+                     uint16_t *buffer);
+int drive_lba28_write(drive_entry_t *drive, uint32_t lba, uint8_t count,
+                      uint16_t *buffer);
+#endif
