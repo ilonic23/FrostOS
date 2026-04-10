@@ -10,7 +10,6 @@ void callback(registers_t *regs) {
         kercall_timer_pit_sleep_ms(regs);
         break;
     case 3001: {
-
         uint64_t result = kercall_timer_pit_get_ms(regs);
         uint32_t lower = result & 0xFFFFFFFF;
         uint32_t upper = result >> 32;

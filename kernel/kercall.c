@@ -41,7 +41,7 @@ void kercall_powerctl_halt(registers_t *regs) {
 
 void kercall_pcspk_beep(registers_t *regs) {
     (void)regs;
-    speaker_beep();
+    speaker_set_frequency(440);
 }
 
 void kercall_pcspk_set_freq(registers_t *regs) {
