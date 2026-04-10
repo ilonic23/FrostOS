@@ -40,3 +40,14 @@ int drive_lba28_write(drive_entry_t *drive, uint32_t lba, uint8_t count,
         return 0;
     }
 }
+
+uint32_t drive_lba28_sects(drive_entry_t *drive) {
+    switch (drive->type) {
+    case DRIVE_ATA:
+    case DRIVE_ATA_ATAPI:
+    case DRIVE_ATA_SATA:
+        return ata_get_lba28_sects(drive->control.ata_drive);
+    default:
+        return 0;
+    }
+}

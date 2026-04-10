@@ -30,4 +30,6 @@ int drive_lba28_read(drive_entry_t *drive, uint32_t lba, uint8_t count,
                      uint16_t *buffer);
 int drive_lba28_write(drive_entry_t *drive, uint32_t lba, uint8_t count,
                       uint16_t *buffer);
+uint32_t drive_lba28_sects(drive_entry_t *drive);
+
 #endif
