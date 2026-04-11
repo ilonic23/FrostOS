@@ -1,6 +1,8 @@
+#include "../drivers/display/display.h"
 #include "../drivers/keyboard.h"
 #include "../libc/ctype.h"
 #include "../libc/mem.h"
+#include "../libc/rand.h"
 #include "../libc/stdio.h"
 #include "../libc/string.h"
 #include <stdint.h>
@@ -81,6 +83,23 @@ double stod(const char *str) {
     return result;
 }
 
+uint64_t get_ms() {
+    uint32_t low, high;
+    asm volatile("mov $3001, %%eax;"
+                 "int $0x99;"
+                 : "=a"(low), "=b"(high)
+                 :
+                 : "memory");
+    return ((uint64_t)high << 32 | low);
+}
+
+void sleep(uint64_t ms) {
+    uint64_t start = get_ms();
+    uint64_t current = get_ms();
+    while (current - start < ms)
+        current = get_ms();
+}
+
 int echo(int argc, char **argv) {
     if (argc < 2) {
         printf("Usage: %s <str>\n", argv[0]);
@@ -119,6 +138,27 @@ int power(int argc, char **argv) {
     return 0;
 }
 
+void beep() {
+    asm volatile("mov $3005, %eax;"
+                 "int $0x99;");
+    sleep(100);
+    asm volatile("mov $3007, %eax;"
+                 "int $0x99;");
+}
+
+void rand() {
+    char temp[32] = {0};
+    pcg32_init(get_ms());
+    sprintf(temp, "%u", pcg32());
+    for (int i = 0; i < 32; ++i) {
+        display_set_foreground(DISPLAY_COLOR(
+            pcg32_lim(40, 255), pcg32_lim(40, 255), pcg32_lim(40, 255)));
+        printf("%c", temp[i]);
+    }
+    display_set_foreground(DISPLAY_COLOR(255, 255, 255));
+    printf("\n");
+}
+
 void shell() {
     char *input = kmalloc(512);
     char *arg_buffer = kmalloc(512);
@@ -138,6 +178,10 @@ void shell() {
             echo(argc, argv);
         else if (strcmp(argv[0], "power") == 0)
             power(argc, argv);
+        else if (strcmp(argv[0], "beep") == 0)
+            beep();
+        else if (strcmp(argv[0], "rand") == 0)
+            rand();
         else
             printf("Unknown command.\n");
     }
