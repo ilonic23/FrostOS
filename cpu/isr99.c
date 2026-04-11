@@ -39,6 +39,24 @@ void callback(registers_t *regs) {
         uint32_t freq = kercall_pcspk_get_freq(regs);
         regs->eax = freq;
     } break;
+    case 3010:
+        kercall_display_clear(regs);
+        break;
+    case 3011:
+        kercall_display_select_cur_foreground(regs);
+        break;
+    case 3012:
+        kercall_display_select_cur_background(regs);
+        break;
+    case 3013:
+        kercall_display_print_char_ez(regs);
+        break;
+    case 3014:
+        kercall_display_print_str(regs);
+        break;
+    case 3015:
+        kercall_display_set_cur_pos(regs);
+        break;
     }
 }
 

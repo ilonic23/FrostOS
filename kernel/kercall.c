@@ -2,6 +2,7 @@
 #include <stdint.h>
 
 #include "../cpu/timer.h"
+#include "../drivers/display/display.h"
 #include "../drivers/pcspk.h"
 #include "../power/powerctl.h"
 #include "kernel.h"
@@ -56,4 +57,31 @@ uint32_t kercall_pcspk_get_freq(registers_t *regs) {
 void kercall_pcspk_stop(registers_t *regs) {
     (void)regs;
     speaker_stop();
+}
+
+// --- Display functions ---
+
+void kercall_display_select_cur_foreground(registers_t *regs) {
+    display_set_foreground(DISPLAY_COLOR(regs->ebx, regs->ecx, regs->edx));
+}
+
+void kercall_display_select_cur_background(registers_t *regs) {
+    display_set_background(DISPLAY_COLOR(regs->ebx, regs->ecx, regs->edx));
+}
+
+void kercall_display_clear(registers_t *regs) {
+    (void)regs;
+    display_clear_screen();
+}
+
+void kercall_display_print_char_ez(registers_t *regs) {
+    display_print_char_ez(regs->ebx);
+}
+
+void kercall_display_print_str(registers_t *regs) {
+    display_print_str((char *)(uintptr_t)regs->ebx);
+}
+
+void kercall_display_set_cur_pos(registers_t *regs) {
+    display_set_cursor_pos(regs->ebx, regs->ecx);
 }
