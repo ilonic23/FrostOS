@@ -34,3 +34,6 @@ make iso
 ```sh
 make run-grub
 ```
+
+## System API:
+[click](https://github.com/ilonic23/FrostOS/blob/dev/docs/KERCALL.md)
