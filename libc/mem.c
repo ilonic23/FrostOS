@@ -1,4 +1,5 @@
 #include "mem.h"
+#include "./stdio.h"
 
 void memory_set(uint8_t *dest, uint8_t val, uint32_t len) {
     uint8_t *temp = (uint8_t *)dest;
@@ -52,17 +53,17 @@ void *memmove(void *dest, const void *src, size_t n) {
     return dest;
 }
 
-typedef struct __attribute__((packed)) {
+typedef struct __attribute__((packed)) mem_block {
     uint8_t status; // bit 0 set - free, else used
     uint32_t size;
-    uint32_t next;
+    struct mem_block *next;
 } mem_block_t;
 
 static void *start;
 
 void kmalloc_init(void *st, uint32_t size) {
     start = st;
-    mem_block_t block = {.status = 0x01, .size = size, .next = (uintptr_t)st};
+    mem_block_t block = {.status = 0x01, .size = size, .next = 0};
     memcpy(st, &block, sizeof(block));
 }
 
@@ -80,17 +81,23 @@ void *kmalloc(uint32_t size) {
 
     mem_block_t *cur_block = next_free;
     uint32_t old_size = cur_block->size;
+    mem_block_t *old_next = cur_block->next;
 
     cur_block->status &= ~(1u << 0);
     cur_block->size = size;
 
-    mem_block_t *new_free = (mem_block_t *)((uint8_t *)(cur_block + 1) + size);
-    mem_block_t new_free_block = {.status = 0x01,
-                                  .size = old_size - size - sizeof(mem_block_t),
-                                  .next = 0};
-
-    memcpy(new_free, &new_free_block, sizeof(new_free_block));
-    cur_block->next = (uintptr_t)new_free;
+    uint32_t remaining = old_size - size - sizeof(mem_block_t);
+    if (old_size >= size + sizeof(mem_block_t) + 4) {
+        mem_block_t *new_free =
+            (mem_block_t *)((uint8_t *)(cur_block + 1) + size);
+        mem_block_t new_free_block = {
+            .status = 0x01, .size = remaining, .next = old_next};
+        memcpy(new_free, &new_free_block, sizeof(new_free_block));
+        cur_block->next = new_free;
+    } else {
+        cur_block->size = old_size;
+        cur_block->next = old_next;
+    }
 
     return (void *)(cur_block + 1);
 }
