@@ -1,6 +1,5 @@
 #include "ata.h"
 #include "../../cpu/ports.h"
-#include "../../kernel/log.h"
 
 #define MASTER 0xA0
 #define SLAVE 0xB0
@@ -90,7 +89,6 @@ int ata_identify(uint8_t secondary, uint8_t slave, ata_drive_t *drive) {
             is_ata = 0;
             break;
         }
-        sys_log_msg("BSY");
     }
 
     uint8_t atapi, sata;
@@ -116,7 +114,6 @@ int ata_identify(uint8_t secondary, uint8_t slave, ata_drive_t *drive) {
             break;
         if (status & (1u << 0))
             return 2; // ERR
-        sys_log_msg("BSY");
     }
 
     for (int i = 0; i < 256; ++i)
