@@ -159,6 +159,40 @@ void rand() {
     printf("\n");
 }
 
+void date() {
+    uint32_t years, months, days;
+    asm volatile("mov $3030, %%eax;"
+                 "int $0x99;"
+                 : "=a"(years), "=b"(months), "=c"(days)
+                 :
+                 : "memory");
+    printf("Date: %u.%u.%u\n", years, months, days);
+}
+
+void time() {
+    uint32_t hours, minutes, seconds, milliseconds;
+    asm volatile("mov $3031, %%eax;"
+                 "int $0x99;"
+                 : "=a"(hours), "=b"(minutes), "=c"(seconds), "=d"(milliseconds)
+                 :
+                 : "memory");
+    printf("Time: %u:%u:%u:%u\n", hours, minutes, seconds, milliseconds);
+}
+
+void clear() {
+    asm volatile("mov $3010, %eax;"
+                 "int $0x99;");
+}
+
+void uptime() {
+    uint64_t uptime = get_ms();
+    printf("Uptime:\n %lu Hours %lu Minutes %lu Seconds %lu "
+           "Milliseconds\n",
+           uptime / (1000 * 60 * 60), (uptime / (1000 * 60)) % 60,
+           (uptime / 1000) % 60, uptime % 1000);
+    printf("Raw:\n %lu ms\n", uptime);
+}
+
 void shell() {
     char *input = kmalloc(512);
     char *arg_buffer = kmalloc(512);
@@ -182,6 +216,14 @@ void shell() {
             beep();
         else if (strcmp(argv[0], "rand") == 0)
             rand();
+        else if (strcmp(argv[0], "date") == 0)
+            date();
+        else if (strcmp(argv[0], "time") == 0)
+            time();
+        else if (strcmp(argv[0], "clear") == 0)
+            clear();
+        else if (strcmp(argv[0], "uptime") == 0)
+            uptime();
         else
             printf("Unknown command.\n");
     }
