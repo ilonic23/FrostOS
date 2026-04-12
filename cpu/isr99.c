@@ -57,6 +57,12 @@ void callback(registers_t *regs) {
     case 3015:
         kercall_display_set_cur_pos(regs);
         break;
+    case 3030:
+        kercall_rtc_get_date(regs);
+        break;
+    case 3031:
+        kercall_rtc_get_time_new(regs);
+        break;
     }
 }
 

@@ -26,6 +26,19 @@ uintptr_t kercall_rtc_get_time(registers_t *regs) {
     return (uintptr_t)&get_kernel_globals()->datetime;
 }
 
+void kercall_rtc_get_date(registers_t *regs) {
+    regs->eax = get_kernel_globals()->datetime.year;
+    regs->ebx = get_kernel_globals()->datetime.month;
+    regs->ecx = get_kernel_globals()->datetime.day;
+}
+
+void kercall_rtc_get_time_new(registers_t *regs) {
+    regs->eax = get_kernel_globals()->datetime.hours;
+    regs->ebx = get_kernel_globals()->datetime.minutes;
+    regs->ecx = get_kernel_globals()->datetime.seconds;
+    regs->edx = get_kernel_globals()->datetime.milliseconds;
+}
+
 // --- Power Control functions ---
 
 void kercall_powerctl_reboot(registers_t *regs) {
