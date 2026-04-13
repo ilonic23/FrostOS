@@ -322,7 +322,10 @@ void shell() {
             memmap();
         else if (strcmp(argv[0], "driveinfo") == 0)
             driveinfo();
-        else
-            printf("Unknown command.\n");
+        else {
+            display_set_foreground(DISPLAY_COLOR(255, 0, 0));
+            printf("Unknown file or command: %s\n", argv[0]);
+            display_set_foreground(DISPLAY_COLOR(255, 255, 255));
+        }
     }
 }
