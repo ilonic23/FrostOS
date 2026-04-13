@@ -5,6 +5,7 @@
 #include "../libc/rand.h"
 #include "../libc/stdio.h"
 #include "../libc/string.h"
+#include "kernel.h"
 #include <stdint.h>
 
 int split_string(char *string, char **output) {
@@ -193,6 +194,93 @@ void uptime() {
     printf("Raw:\n %lu ms\n", uptime);
 }
 
+void osinfo() {
+    printf("OS: %s\nVersion: %s\nCodename: %s\n",
+           get_kernel_globals()->kernel_name,
+           get_kernel_globals()->kernel_version,
+           get_kernel_globals()->kernel_codename);
+}
+
+void cpuinfo() {
+    if (get_kernel_globals()->cpuid_supported)
+        printf("Vendor: %s\nFull name: %s\n",
+               get_kernel_globals()->cpu_manufacturer,
+               get_kernel_globals()->cpu_full_name);
+    else
+        printf("CPUID instruction not supported.\n");
+}
+
+void meminfo() {
+    multiboot_info_t *mbi = get_kernel_globals()->multiboot_addr;
+    printf("Lower memory: %lu KB\n", mb_get_lower_mem(mbi) / 1024);
+    printf("Upper memory %lu KB\n", mb_get_upper_mem(mbi) / 1024);
+    printf("Total memory %lu KB\n", mb_get_mem(mbi) / 1024);
+}
+
+void memmap() {
+    multiboot_info_t *mbi = get_kernel_globals()->multiboot_addr;
+    if (mbi->flags & (1u << 6))
+        for (uint32_t i = 0; i < mbi->mmap_length;
+             i += sizeof(multiboot_mmap_entry_t)) {
+            multiboot_mmap_entry_t entry =
+                *(multiboot_mmap_entry_t *)(uintptr_t)(mbi->mmap_addr + i);
+            printf("Entry: %d\n", i);
+            printf("Address: 0x%lx Size: %uB Length: %luB Type: ", entry.addr,
+                   entry.size, entry.len);
+            switch (entry.type) {
+            case MULTIBOOT_MEMORY_AVAILABLE:
+                printf("Available");
+                break;
+            case MULTIBOOT_MEMORY_RESERVED:
+                printf("Reserved");
+                break;
+            case MULTIBOOT_MEMORY_ACPI_RECLAIMABLE:
+                printf("ACPI reclaimable");
+                break;
+            case MULTIBOOT_MEMORY_NVS:
+                printf("NVS");
+                break;
+            case MULTIBOOT_MEMORY_BADRAM:
+                printf("BADRAM");
+                break;
+            default:
+                printf("Unknown");
+                break;
+            }
+            printf("\n");
+        }
+    else {
+        printf("Multiboot memory maps unavailable.\n");
+    }
+}
+
+void driveinfo() {
+    for (int i = 0; i < get_kernel_globals()->drives_count; ++i) {
+        printf("Drive %d:\n", i);
+        printf("Size: %u KB ",
+               drive_lba28_sects(&get_kernel_globals()->drives[i]) / 2);
+        printf("Type: ");
+        switch (get_kernel_globals()->drives[i].type) {
+        case DRIVE_NULL:
+            printf("None");
+            break;
+        case DRIVE_ATA:
+            printf("ATA IDE");
+            break;
+        case DRIVE_ATA_ATAPI:
+            printf("ATA ATAPI");
+            break;
+        case DRIVE_ATA_SATA:
+            printf("ATA SATA");
+            break;
+        default:
+            printf("Unsupported");
+            break;
+        }
+        printf("\n");
+    }
+}
+
 void shell() {
     char *input = kmalloc(512);
     char *arg_buffer = kmalloc(512);
@@ -224,6 +312,16 @@ void shell() {
             clear();
         else if (strcmp(argv[0], "uptime") == 0)
             uptime();
+        else if (strcmp(argv[0], "osinfo") == 0)
+            osinfo();
+        else if (strcmp(argv[0], "cpuinfo") == 0)
+            cpuinfo();
+        else if (strcmp(argv[0], "meminfo") == 0)
+            meminfo();
+        else if (strcmp(argv[0], "memmap") == 0)
+            memmap();
+        else if (strcmp(argv[0], "driveinfo") == 0)
+            driveinfo();
         else
             printf("Unknown command.\n");
     }
