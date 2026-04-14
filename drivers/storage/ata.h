@@ -11,6 +11,7 @@ typedef struct {
 } ata_drive_t;
 
 int ata_identify(uint8_t secondary, uint8_t slave, ata_drive_t *drive);
+void ata_str_to_c(char *dest, const uint16_t *src, int words);
 uint32_t ata_get_lba28_sects(ata_drive_t *drive);
 uint64_t ata_get_lba48_sects(ata_drive_t *drive);
 int ata_lba28_read(ata_drive_t *drive, uint32_t lba, uint8_t count,

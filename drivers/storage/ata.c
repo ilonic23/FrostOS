@@ -137,6 +137,20 @@ int ata_identify(uint8_t secondary, uint8_t slave, ata_drive_t *drive) {
     return 0; // ATA detected, OK
 }
 
+// https://read.seas.harvard.edu/cs161/2019/pdf/ata-atapi-8.pdf#M6.9.67214.Head2.329.ATA.string.convention
+void ata_str_to_c(char *dest, const uint16_t *src, int words) {
+    for (int i = 0; i < words; ++i) {
+        dest[i * 2] = (char)(src[i] >> 8);
+        dest[i * 2 + 1] = (char)(src[i] & 0xFF);
+    }
+    dest[words * 2] = '\0';
+
+    // Trim trailing spaces
+    int len = words * 2;
+    while (len > 0 && dest[len - 1] == ' ')
+        dest[--len] = '\0';
+}
+
 // If 0, LBA28 isn't supported
 uint32_t ata_get_lba28_sects(ata_drive_t *drive) {
     uint32_t result =
