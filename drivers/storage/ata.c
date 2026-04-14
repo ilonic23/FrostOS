@@ -52,6 +52,12 @@ void ata_software_reset(uint16_t io_base, uint16_t ct_base) {
         ;
 }
 
+void ata_select_drive(ata_drive_t *drive) {
+    uint8_t drv = drive->flags & (1u << 0) ? SLAVE : MASTER;
+    port_byte_out(drive->io_base + DRV_HEAD_REG, drv);
+    ata_400ns_delay(drive->io_base, drive->ct_base);
+}
+
 int ata_identify(uint8_t secondary, uint8_t slave, ata_drive_t *drive) {
     uint16_t io_base = secondary ? SECONDARY_IO_BASE : PRIMARY_IO_BASE;
     uint16_t ct_base = secondary ? SECONDARY_CT_BASE : SECONDARY_CT_BASE;
@@ -59,10 +65,7 @@ int ata_identify(uint8_t secondary, uint8_t slave, ata_drive_t *drive) {
 
     ata_software_reset(io_base, ct_base);
 
-    // Select drive
-    port_byte_out(io_base + DRV_HEAD_REG, drv);
-
-    ata_400ns_delay(io_base, ct_base);
+    ata_select_drive(drive);
 
     // Set LBAlo, LBAmid, LBAhi to 0
     port_byte_out(io_base + LBA_LO_REG, 0);
@@ -160,6 +163,8 @@ int ata_lba28_read(ata_drive_t *drive, uint32_t lba, uint8_t count,
     if ((lba + count) > total_sects)
         return 0;
 
+    ata_select_drive(drive);
+
     port_byte_out(drive->io_base + DRV_HEAD_REG, 0xE0 | ((lba >> 24) & 0x0F));
 
     port_byte_out(drive->io_base + SECT_CNT_REG, count);
@@ -203,6 +208,8 @@ int ata_lba28_write(ata_drive_t *drive, uint32_t lba, uint8_t count,
         return 0;
     if ((lba + count) > total_sects)
         return 0;
+
+    ata_select_drive(drive);
 
     port_byte_out(drive->io_base + DRV_HEAD_REG, 0xE0 | ((lba >> 24) & 0x0F));
 
