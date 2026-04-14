@@ -1,6 +1,7 @@
 #ifndef EXT2_H
 #define EXT2_H
 
+#include "../drivers/storage/drive.h"
 #include <stdint.h>
 
 typedef struct __attribute__((packed)) {
@@ -64,6 +65,11 @@ typedef struct __attribute__((packed)) {
 } ext2_superblock_ex_t;
 
 typedef struct __attribute__((packed)) {
+    ext2_superblock_t base;
+    ext2_superblock_ex_t extended;
+} ext2_full_superblock_t;
+
+typedef struct __attribute__((packed)) {
     uint32_t block_usage_bitmap_block; // Block address of block usage bitmap
     uint32_t inode_usage_bitmap_block; // Block address of inode usage bitmap
     uint32_t inode_table_start_block;
@@ -104,5 +110,22 @@ typedef struct __attribute__((packed)) {
     uint8_t type;
     char name[];
 } ext2_dir_entry_t;
+
+typedef struct {
+    drive_entry_t *drive;
+    ext2_superblock_t *superblock;
+    ext2_superblock_ex_t *superblock_ex;
+} ext2_fs_entry;
+
+ext2_fs_entry *ext2_init(drive_entry_t *d);
+void ext2_free(ext2_fs_entry *entry);
+uint32_t ext2_get_block_size(ext2_fs_entry *entry);
+int ext2_read_block(ext2_fs_entry *entry, uint32_t block, uint8_t *buffer);
+uint32_t ext2_bgdt_block(ext2_fs_entry *entry);
+int ext2_read_inode(ext2_fs_entry *entry, uint32_t num, ext2_inode_t *inode);
+int ext2_read_inode_block(ext2_fs_entry *entry, ext2_inode_t *inode,
+                          uint32_t block, uint8_t *buffer);
+int ext2_read_inode_whole(ext2_fs_entry *entry, ext2_inode_t *inode,
+                          uint8_t *buffer);
 
 #endif
