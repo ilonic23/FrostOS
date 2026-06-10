@@ -1,5 +1,8 @@
+#ifndef KERNEL_GLOBALS_H
+#define KERNEL_GLOBALS_H
+
 #include "../drivers/clock.h"
-#include "../drivers/storage/drive.h"
+#include "../drivers/storage/ata.h"
 #include "../multiboot/multiboot.h"
 #include <stdint.h>
 
@@ -12,8 +15,10 @@ typedef struct {
     char *kernel_name;
     char *kernel_version;
     char *kernel_codename;
-    drive_entry_t *drives;
+    ata_drive_t *drives;
     uint16_t drives_count;
     uint16_t *pci_devs;
     uint16_t pci_dev_count;
 } kernel_globals;
+
+#endif

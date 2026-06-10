@@ -1,10 +1,11 @@
 #include "isr.h"
-#include "idt.h"
 #include "../drivers/keyboard.h"
+#include "../kernel/kernel.h"
+#include "idt.h"
 #include "isr99.h"
-#include "timer.h"
 #include "ports.h"
 #include "rtc.h"
+#include "timer.h"
 
 isr_t interrupt_handlers[256];
 
@@ -55,7 +56,7 @@ void isr_install() {
     port_byte_out(0x21, 0x01);
     port_byte_out(0xA1, 0x01);
     port_byte_out(0x21, 0x0);
-    port_byte_out(0xA1, 0x0); 
+    port_byte_out(0xA1, 0x0);
 
     // Install the IRQs
     set_idt_gate(32, (uint32_t)irq0);
@@ -79,59 +80,51 @@ void isr_install() {
 }
 
 /* To print the message which defines every exception */
-char *exception_messages[] = {
-    "Division By Zero",
-    "Debug",
-    "Non Maskable Interrupt",
-    "Breakpoint",
-    "Into Detected Overflow",
-    "Out of Bounds",
-    "Invalid Opcode",
-    "No Coprocessor", // 7
+char *exception_messages[] = {"Division By Zero",
+                              "Debug",
+                              "Non Maskable Interrupt",
+                              "Breakpoint",
+                              "Into Detected Overflow",
+                              "Out of Bounds",
+                              "Invalid Opcode",
+                              "No Coprocessor", // 7
 
-    "Double Fault",
-    "Coprocessor Segment Overrun",
-    "Bad TSS",
-    "Segment Not Present",
-    "Stack Fault",
-    "General Protection Fault", // 13
-    "Page Fault",
-    "Unknown Interrupt",
+                              "Double Fault",
+                              "Coprocessor Segment Overrun",
+                              "Bad TSS",
+                              "Segment Not Present",
+                              "Stack Fault",
+                              "General Protection Fault", // 13
+                              "Page Fault",
+                              "Unknown Interrupt",
 
-    "Coprocessor Fault",
-    "Alignment Check",
-    "Machine Check",
-    "Reserved",
-    "Reserved",
-    "Reserved",
-    "Reserved",
-    "Reserved",
+                              "Coprocessor Fault",
+                              "Alignment Check",
+                              "Machine Check",
+                              "Reserved",
+                              "Reserved",
+                              "Reserved",
+                              "Reserved",
+                              "Reserved",
 
-    "Reserved",
-    "Reserved",
-    "Reserved",
-    "Reserved",
-    "Reserved",
-    "Reserved",
-    "Reserved",
-    "Reserved"
-};
+                              "Reserved",
+                              "Reserved",
+                              "Reserved",
+                              "Reserved",
+                              "Reserved",
+                              "Reserved",
+                              "Reserved",
+                              "Reserved"};
 
 void isr_handler(registers_t *r) {
-    /*display_print_str("Received interrupt: ");
-    char s[3];
-    int_to_ascii(r->int_no, s);
-    display_print_str(s);
-    display_print_str("\n");
-    display_print_str(exception_messages[r->int_no]);
-    display_print_str("\n");*/
+    if (r->int_no >= IRQ0 && r->int_no <= IRQ15)
+        return;
 
-    // Handle ISRs like IRQs
-    if (interrupt_handlers[r->int_no] != 0
-        && (r->int_no < IRQ0 || r->int_no > IRQ15)) {
-            isr_t handler = interrupt_handlers[r->int_no];
-            handler(r);
-    }
+    if (interrupt_handlers[r->int_no] != 0) {
+        isr_t handler = interrupt_handlers[r->int_no];
+        handler(r);
+    } else
+        kernel_panic(r->int_no, exception_messages[r->int_no], r);
 }
 
 void register_interrupt_handler(uint8_t n, isr_t handler) {
@@ -141,8 +134,9 @@ void register_interrupt_handler(uint8_t n, isr_t handler) {
 void irq_handler(registers_t *r) {
     /* After every interrupt we need to send an EOI to the PICs
      * or they will not send another interrupt again */
-    if (r->int_no >= 40) port_byte_out(0xA0, 0x20); /* slave */
-    port_byte_out(0x20, 0x20); /* master */
+    if (r->int_no >= 40)
+        port_byte_out(0xA0, 0x20); /* slave */
+    port_byte_out(0x20, 0x20);     /* master */
 
     /* Handle the interrupt in a more modular way */
     if (interrupt_handlers[r->int_no] != 0) {
