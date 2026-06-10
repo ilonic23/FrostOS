@@ -28,6 +28,7 @@
 #define READ_SECTS 0x20
 #define READ_SECTS_EX 0x24
 #define WRITE_SECTS 0x30
+#define DEVICE_DIAG 0x90
 
 #define CACHE_FLUSH 0xE7
 
@@ -255,4 +256,12 @@ int ata_lba28_write(ata_drive_t *drive, uint32_t lba, uint8_t count,
     }
     ata_cache_flush(drive->io_base);
     return 1;
+}
+
+uint8_t ata_perform_device_diagnostics(ata_drive_t *drive) {
+    ata_select_drive(drive);
+    port_byte_out(drive->io_base + CMD_REG, DEVICE_DIAG);
+    while (port_byte_in(drive->io_base + STATUS_REG) & (1u << 7))
+        asm volatile("hlt");
+    return port_byte_in(drive->io_base + ERR_REG);
 }

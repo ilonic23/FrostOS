@@ -18,4 +18,5 @@ int ata_lba28_read(ata_drive_t *drive, uint32_t lba, uint8_t count,
                    uint16_t *buffer);
 int ata_lba28_write(ata_drive_t *drive, uint32_t lba, uint8_t count,
                     uint16_t *buffer);
+uint8_t ata_perform_device_diagnostics(ata_drive_t *drive);
 #endif
