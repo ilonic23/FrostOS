@@ -60,12 +60,14 @@ void ata_select_drive(ata_drive_t *drive) {
 
 int ata_identify(uint8_t secondary, uint8_t slave, ata_drive_t *drive) {
     uint16_t io_base = secondary ? SECONDARY_IO_BASE : PRIMARY_IO_BASE;
-    uint16_t ct_base = secondary ? SECONDARY_CT_BASE : SECONDARY_CT_BASE;
+    uint16_t ct_base = secondary ? SECONDARY_CT_BASE : PRIMARY_CT_BASE;
     uint8_t drv = slave ? SLAVE : MASTER;
 
     ata_software_reset(io_base, ct_base);
 
-    ata_select_drive(drive);
+    // Select drive
+    port_byte_out(io_base + DRV_HEAD_REG, drv);
+    ata_400ns_delay(io_base, ct_base);
 
     // Set LBAlo, LBAmid, LBAhi to 0
     port_byte_out(io_base + LBA_LO_REG, 0);
