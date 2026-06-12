@@ -1,38 +1,36 @@
-#include "../cpu/ports.h"
 #include "../cpu/isr.h"
-#include <stdint.h>
+#include "../cpu/ports.h"
 #include "display/display.h"
+#include <stdint.h>
 
 static uint8_t cur_scancode = 0;
 static uint8_t shift_pressed = 0;
 
-uint8_t get_cur_scancode() {
-    return cur_scancode;
-}
+uint8_t get_cur_scancode() { return cur_scancode; }
 
 // Non-Shifted keys
 static const char keymap[128] = {
-    0,  27, '1','2','3','4','5','6','7','8','9','0','-','=', '\b',
-    '\t','q','w','e','r','t','y','u','i','o','p','[',']','\n',
-    0, 'a','s','d','f','g','h','j','k','l',';','\'','`',
-    0, '\\','z','x','c','v','b','n','m',',','.','/', 0,
-    '*',0,' ',
+    0,   27,  '1',  '2',  '3',  '4', '5', '6',  '7', '8', '9', '0',
+    '-', '=', '\b', '\t', 'q',  'w', 'e', 'r',  't', 'y', 'u', 'i',
+    'o', 'p', '[',  ']',  '\n', 0,   'a', 's',  'd', 'f', 'g', 'h',
+    'j', 'k', 'l',  ';',  '\'', '`', 0,   '\\', 'z', 'x', 'c', 'v',
+    'b', 'n', 'm',  ',',  '.',  '/', 0,   '*',  0,   ' ',
 };
 
-    // Shifted keys
+// Shifted keys
 static const char keymap_shift[128] = {
-    0,  27, '!','@','#','$','%','^','&','*','(',')','_','+', '\b',
-    '\t','Q','W','E','R','T','Y','U','I','O','P','{','}','\n',
-    0, 'A','S','D','F','G','H','J','K','L',':','"','~',
-    0, '|','Z','X','C','V','B','N','M','<','>','?', 0,
-    '*',0,' ',
+    0,   27,  '!',  '@',  '#',  '$', '%', '^', '&', '*', '(', ')',
+    '_', '+', '\b', '\t', 'Q',  'W', 'E', 'R', 'T', 'Y', 'U', 'I',
+    'O', 'P', '{',  '}',  '\n', 0,   'A', 'S', 'D', 'F', 'G', 'H',
+    'J', 'K', 'L',  ':',  '"',  '~', 0,   '|', 'Z', 'X', 'C', 'V',
+    'B', 'N', 'M',  '<',  '>',  '?', 0,   '*', 0,   ' ',
 };
 
-char keyboard_receive_key(char halt)
-{
+char keyboard_receive_key(char halt) {
     // Halt everything until we receive a key
-    while (halt && cur_scancode == 0) asm volatile("hlt");
-    
+    while (halt && cur_scancode == 0)
+        asm volatile("hlt");
+
     // Key release (break code)
     if (cur_scancode & 0x80) {
         unsigned char release_code = cur_scancode & 0x7F;
@@ -53,25 +51,33 @@ char keyboard_receive_key(char halt)
 }
 
 void getline(char *to, char echo, uint32_t max_len) {
+    uint32_t input = 0;
     char key = 0;
     char *start = to;
 
     while (1) {
         key = keyboard_receive_key(1);
-        if (key == '\n') break;
-        if (key == '\0') {
-        	continue;
-        } // ignore
+
+        if (key == '\n')
+            break;
+        if (key == '\0')
+            continue;
+
+        if (key == '\b') {
+            if (input > 0) {
+                to--;
+                input--;
+                if (echo)
+                    display_print_char_ez('\b');
+            }
+            continue;
+        }
 
         if ((uint32_t)(to - start) < max_len - 1) {
             *to++ = key;
-            if (key == '\b') {
-            	to--;
-            	to--;
-            }
-            if (echo) {
+            input++;
+            if (echo)
                 display_print_char_ez(key);
-            }
         }
     }
 
@@ -81,9 +87,7 @@ void getline(char *to, char echo, uint32_t max_len) {
 void kb_callback(registers_t *regs) {
     (void)regs;
     cur_scancode = port_byte_in(0x60);
-    port_byte_out(0x20, 0x20);  // send EOI to master PIC
+    port_byte_out(0x20, 0x20); // send EOI to master PIC
 }
 
-void init_keyboard() {
-    register_interrupt_handler(IRQ1, &kb_callback);
-}
+void init_keyboard() { register_interrupt_handler(IRQ1, &kb_callback); }
