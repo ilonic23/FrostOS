@@ -4,10 +4,14 @@
 #include <stdint.h>
 
 typedef struct __attribute__((packed)) {
-    uint8_t attributes;
-    uint8_t start_chs[3];
-    uint8_t type;
-    uint8_t last_chs[3];
+    uint8_t boot_indicator;
+    uint8_t start_head;
+    uint16_t start_sector : 6;
+    uint16_t start_cylinder : 10;
+    uint8_t system_id;
+    uint8_t end_head;
+    uint16_t end_sector : 6;
+    uint16_t end_cylinder : 10;
     uint32_t start_lba;
     uint32_t sectors; // How much sectors in the partition
 } partition_entry_t;
