@@ -4,9 +4,15 @@
 #include <stdint.h>
 
 static uint8_t cur_scancode = 0;
+static uint8_t extended_scancode = 0;
 static uint8_t shift_pressed = 0;
 
 uint8_t get_cur_scancode() { return cur_scancode; }
+uint8_t get_cur_ex_scancode() {
+    uint8_t temp = extended_scancode;
+    extended_scancode = 0;
+    return temp;
+}
 
 // Non-Shifted keys
 static const char keymap[128] = {
@@ -87,6 +93,8 @@ void getline(char *to, char echo, uint32_t max_len) {
 void kb_callback(registers_t *regs) {
     (void)regs;
     cur_scancode = port_byte_in(0x60);
+    if (cur_scancode == 0xE0)
+        extended_scancode = port_byte_in(0x60);
     port_byte_out(0x20, 0x20); // send EOI to master PIC
 }
 
