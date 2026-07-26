@@ -1,5 +1,8 @@
 #include "ata.h"
 #include "../../cpu/ports.h"
+#include "../../kernel/debug.h"
+
+#define ata_trace(fmt, ...) trace("[ATA] " fmt, ##__VA_ARGS__)
 
 #define MASTER 0xA0
 #define SLAVE 0xB0
@@ -32,7 +35,11 @@
 
 #define CACHE_FLUSH 0xE7
 
-// static uint16_t identify_vals[256];
+#define ATTEMPTS 100000
+#define STATUS_ERR (1u << 0)
+#define STATUS_DRQ (1u << 3)
+#define STATUS_DF (1u << 5)
+#define STATUS_BSY (1u << 7)
 
 void ata_400ns_delay(uint16_t io_base, uint16_t ct_base) {
     for (int i = 0; i < 15; ++i) {
@@ -44,13 +51,41 @@ void ata_400ns_delay(uint16_t io_base, uint16_t ct_base) {
     }
 }
 
-void ata_software_reset(uint16_t io_base, uint16_t ct_base) {
+int ata_wait_bsy(uint16_t io_base) {
+    uint8_t status;
+    for (int i = 0; i < ATTEMPTS; ++i) {
+        status = port_byte_in(io_base + STATUS_REG);
+        if (!(status & STATUS_BSY))
+            return 1;
+    }
+    ata_trace("BSY Timeout");
+    return 0;
+}
+
+int ata_wait_drq(ata_drive_t *drive) {
+    uint8_t status;
+    for (int i = 0; i < ATTEMPTS; ++i) {
+        status = port_byte_in(drive->io_base + STATUS_REG);
+        if (status & STATUS_ERR) {
+            ata_trace("Received an error.");
+            return 0;
+        }
+        if (status & STATUS_DF) {
+            ata_trace("Device fault.");
+            return 0;
+        }
+        if (status & STATUS_DRQ && !(status & STATUS_BSY))
+            return 1;
+    }
+    ata_trace("DRQ Timeout");
+    return 0;
+}
+
+int ata_software_reset(uint16_t io_base, uint16_t ct_base) {
     port_byte_out(ct_base + DEV_CT_REG, 0x04);
     port_byte_out(ct_base + DEV_CT_REG, 0x00); // Clear SRST
 
-    uint8_t status;
-    while ((status = port_byte_in(io_base + STATUS_REG)) & (1u << 7))
-        ;
+    return ata_wait_bsy(io_base);
 }
 
 void ata_select_drive(ata_drive_t *drive) {
@@ -64,7 +99,8 @@ int ata_identify(uint8_t secondary, uint8_t slave, ata_drive_t *drive) {
     uint16_t ct_base = secondary ? SECONDARY_CT_BASE : PRIMARY_CT_BASE;
     uint8_t drv = slave ? SLAVE : MASTER;
 
-    ata_software_reset(io_base, ct_base);
+    if (!ata_software_reset(io_base, ct_base))
+        return -1;
 
     // Select drive
     port_byte_out(io_base + DRV_HEAD_REG, drv);
@@ -174,15 +210,27 @@ uint64_t ata_get_lba48_sects(ata_drive_t *drive) {
 
 int ata_lba28_read(ata_drive_t *drive, uint32_t lba, uint8_t count,
                    uint16_t *buffer) {
+    if (!buffer) {
+        ata_trace("Buffer is null.");
+        return 0;
+    }
+    if (!count) {
+        ata_trace("Sector count is 0.");
+        return 0;
+    }
     uint32_t total_sects = ata_get_lba28_sects(drive);
-    if (lba > total_sects)
+    if (lba >= total_sects) {
+        ata_trace("LBA is more than total sectors.");
         return 0;
-    if ((lba + count) > total_sects)
+    }
+    if ((lba + count) > total_sects) {
+        ata_trace("Attempt to read more than available.");
         return 0;
+    }
 
-    ata_select_drive(drive);
-
-    port_byte_out(drive->io_base + DRV_HEAD_REG, 0xE0 | ((lba >> 24) & 0x0F));
+    uint8_t slave = (drive->flags & 1u) ? (1u << 4) : 0;
+    port_byte_out(drive->io_base + DRV_HEAD_REG,
+                  0xE0 | slave | ((lba >> 24) & 0x0F));
 
     port_byte_out(drive->io_base + SECT_CNT_REG, count);
 
@@ -191,18 +239,11 @@ int ata_lba28_read(ata_drive_t *drive, uint32_t lba, uint8_t count,
     port_byte_out(drive->io_base + LBA_HI_REG, (lba >> 16) & 0xFF);
 
     port_byte_out(drive->io_base + CMD_REG, READ_SECTS);
+    ata_400ns_delay(drive->io_base, drive->ct_base);
 
     for (int i = 0; i < count; ++i) {
-        uint8_t status;
-        while (1) {
-            status = port_byte_in(drive->io_base + STATUS_REG);
-            if (status & (1u << 0))
-                return 0;
-            if (status & (1u << 7))
-                continue;
-            if (status & (1u << 3))
-                break;
-        }
+        if (!ata_wait_drq(drive))
+            return 0;
 
         for (int j = 0; j < 256; ++j)
             *buffer++ = port_word_in(drive->io_base + DATA_REG);
@@ -212,23 +253,34 @@ int ata_lba28_read(ata_drive_t *drive, uint32_t lba, uint8_t count,
     return 1;
 }
 
-void ata_cache_flush(uint16_t io_base) {
+int ata_cache_flush(uint16_t io_base) {
     port_byte_out(io_base + CMD_REG, CACHE_FLUSH);
-    while (port_byte_in(io_base + STATUS_REG) & (1u << 7))
-        ;
+    return ata_wait_bsy(io_base);
 }
 
 int ata_lba28_write(ata_drive_t *drive, uint32_t lba, uint8_t count,
                     uint16_t *buffer) {
+    if (!buffer) {
+        ata_trace("Buffer is null.");
+        return 0;
+    }
+    if (!count) {
+        ata_trace("Sector count is 0.");
+        return 0;
+    }
     uint32_t total_sects = ata_get_lba28_sects(drive);
-    if (lba > total_sects)
+    if (lba >= total_sects) {
+        ata_trace("LBA is more than total sectors.");
         return 0;
-    if ((lba + count) > total_sects)
+    }
+    if ((lba + count) > total_sects) {
+        ata_trace("Attempt to write more than available.");
         return 0;
+    }
 
-    ata_select_drive(drive);
-
-    port_byte_out(drive->io_base + DRV_HEAD_REG, 0xE0 | ((lba >> 24) & 0x0F));
+    uint8_t slave = (drive->flags & 1u) ? (1u << 4) : 0;
+    port_byte_out(drive->io_base + DRV_HEAD_REG,
+                  0xE0 | slave | ((lba >> 24) & 0x0F));
 
     port_byte_out(drive->io_base + SECT_CNT_REG, count);
 
@@ -237,25 +289,119 @@ int ata_lba28_write(ata_drive_t *drive, uint32_t lba, uint8_t count,
     port_byte_out(drive->io_base + LBA_HI_REG, (lba >> 16) & 0xFF);
 
     port_byte_out(drive->io_base + CMD_REG, WRITE_SECTS);
+    ata_400ns_delay(drive->io_base, drive->ct_base);
 
     for (int i = 0; i < count; ++i) {
-        uint8_t status;
-        while (1) {
-            status = port_byte_in(drive->io_base + STATUS_REG);
-            if (status & (1u << 0))
-                return 0;
-            if (status & (1u << 7))
-                continue;
-            if (status & (1u << 3))
-                break;
-        }
+        if (!ata_wait_drq(drive))
+            return 0;
 
         for (int j = 0; j < 256; ++j)
             port_word_out(drive->io_base + DATA_REG, *buffer++);
         ata_400ns_delay(drive->io_base, drive->ct_base);
     }
-    ata_cache_flush(drive->io_base);
+    return ata_cache_flush(drive->io_base);
+}
+
+int ata_lba48_read(ata_drive_t *drive, uint64_t lba, uint16_t count,
+                   uint16_t *buffer) {
+    if (!buffer) {
+        ata_trace("Buffer is null.");
+        return 0;
+    }
+    if (!count) {
+        ata_trace("Sector count is 0.");
+        return 0;
+    }
+    uint64_t total_sects = ata_get_lba48_sects(drive);
+    if (lba >= total_sects) {
+        ata_trace("LBA is more than total sectors.");
+        return 0;
+    }
+    if ((lba + count) > total_sects) {
+        ata_trace("Attempt to read more than available.");
+        return 0;
+    }
+
+    uint8_t slave = (drive->flags & 1u) ? (1u << 4) : 0;
+    port_byte_out(drive->io_base + DRV_HEAD_REG,
+                  0xE0 | slave | ((lba >> 24) & 0x0F));
+
+    port_byte_out(drive->io_base + SECT_CNT_REG, count >> 8);
+
+    uint8_t *lba_bytes = (uint8_t *)&lba;
+    port_byte_out(drive->io_base + LBA_LO_REG, lba_bytes[3]);
+    port_byte_out(drive->io_base + LBA_MID_REG, lba_bytes[4]);
+    port_byte_out(drive->io_base + LBA_HI_REG, lba_bytes[5]);
+
+    port_byte_out(drive->io_base + SECT_CNT_REG, count & 0x00FF);
+
+    port_byte_out(drive->io_base + LBA_LO_REG, lba_bytes[0]);
+    port_byte_out(drive->io_base + LBA_MID_REG, lba_bytes[1]);
+    port_byte_out(drive->io_base + LBA_HI_REG, lba_bytes[2]);
+
+    port_byte_out(drive->io_base + CMD_REG, READ_SECTS_EX);
+    ata_400ns_delay(drive->io_base, drive->ct_base);
+
+    for (int i = 0; i < count; ++i) {
+        if (!ata_wait_drq(drive))
+            return 0;
+
+        for (int j = 0; j < 256; ++j)
+            *buffer++ = port_word_in(drive->io_base + DATA_REG);
+        ata_400ns_delay(drive->io_base, drive->ct_base);
+    }
     return 1;
+}
+
+int ata_lba48_write(ata_drive_t *drive, uint64_t lba, uint16_t count,
+                    uint16_t *buffer) {
+    if (!buffer) {
+        ata_trace("Buffer is null.");
+        return 0;
+    }
+    if (!count) {
+        ata_trace("Sector count is 0.");
+        return 0;
+    }
+    uint64_t total_sects = ata_get_lba48_sects(drive);
+    if (lba >= total_sects) {
+        ata_trace("LBA is more than total sectors.");
+        return 0;
+    }
+    if ((lba + count) > total_sects) {
+        ata_trace("Attempt to read more than available.");
+        return 0;
+    }
+
+    uint8_t slave = (drive->flags & 1u) ? (1u << 4) : 0;
+    port_byte_out(drive->io_base + DRV_HEAD_REG,
+                  0xE0 | slave | ((lba >> 24) & 0x0F));
+
+    port_byte_out(drive->io_base + SECT_CNT_REG, count >> 8);
+
+    uint8_t *lba_bytes = (uint8_t *)&lba;
+    port_byte_out(drive->io_base + LBA_LO_REG, lba_bytes[3]);
+    port_byte_out(drive->io_base + LBA_MID_REG, lba_bytes[4]);
+    port_byte_out(drive->io_base + LBA_HI_REG, lba_bytes[5]);
+
+    port_byte_out(drive->io_base + SECT_CNT_REG, count & 0x00FF);
+
+    port_byte_out(drive->io_base + LBA_LO_REG, lba_bytes[0]);
+    port_byte_out(drive->io_base + LBA_MID_REG, lba_bytes[1]);
+    port_byte_out(drive->io_base + LBA_HI_REG, lba_bytes[2]);
+
+    port_byte_out(drive->io_base + CMD_REG, READ_SECTS_EX);
+    ata_400ns_delay(drive->io_base, drive->ct_base);
+
+    for (int i = 0; i < count; ++i) {
+        if (!ata_wait_drq(drive))
+            return 0;
+
+        for (int j = 0; j < 256; ++j)
+            port_word_out(drive->io_base + DATA_REG, *buffer++);
+        ata_400ns_delay(drive->io_base, drive->ct_base);
+    }
+    return ata_cache_flush(drive->io_base);
 }
 
 uint8_t ata_perform_device_diagnostics(ata_drive_t *drive) {
