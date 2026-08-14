@@ -3,10 +3,13 @@
 
 #include <stdint.h>
 
-uint8_t get_cur_scancode();
-char keyboard_receive_key(char halt);
-void getline(char *to, char echo, uint32_t max_len);
+uint8_t kb_cur_scancode();
+uint8_t kb_cur_ex_scancode();
+uint8_t kb_cur_status();
+int kb_is_shift();
+int kb_is_ctrl();
+int kb_is_alt();
+char kb_receive_char(int halt);
 void init_keyboard();
-
 
 #endif

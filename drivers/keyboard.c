@@ -1,18 +1,25 @@
 #include "../cpu/isr.h"
 #include "../cpu/ports.h"
-#include "display/display.h"
 #include <stdint.h>
 
 static uint8_t cur_scancode = 0;
-static uint8_t extended_scancode = 0;
-static uint8_t shift_pressed = 0;
+static uint8_t ex_scancode = 0;
+static uint8_t status = 0;
 
-uint8_t get_cur_scancode() { return cur_scancode; }
-uint8_t get_cur_ex_scancode() {
-    uint8_t temp = extended_scancode;
-    extended_scancode = 0;
-    return temp;
-}
+#define OBF (1u << 0)
+
+#define SHIFT (1u << 0)
+#define CTRL (1u << 1)
+#define ALT (1u << 2)
+
+#define IS status &
+
+uint8_t kb_cur_scancode() { return cur_scancode; }
+uint8_t kb_cur_ex_scancode() { return ex_scancode; }
+uint8_t kb_cur_status() { return status; }
+int kb_is_shift() { return IS SHIFT; }
+int kb_is_ctrl() { return IS CTRL; }
+int kb_is_alt() { return IS ALT; }
 
 // Non-Shifted keys
 static const char keymap[128] = {
@@ -32,70 +39,52 @@ static const char keymap_shift[128] = {
     'B', 'N', 'M',  '<',  '>',  '?', 0,   '*', 0,   ' ',
 };
 
-char keyboard_receive_key(char halt) {
-    // Halt everything until we receive a key
+char kb_receive_char(int halt) {
     while (halt && cur_scancode == 0)
         asm volatile("hlt");
 
-    // Key release (break code)
-    if (cur_scancode & 0x80) {
-        unsigned char release_code = cur_scancode & 0x7F;
-        if (release_code == 0x2A || release_code == 0x36) // Left/Right Shift
-            shift_pressed = 0;
-        return 0; // Ignore key releases
-    }
-
-    // Shift pressed
-    if (cur_scancode == 0x2A || cur_scancode == 0x36) { // Left/Right Shift
-        shift_pressed = 1;
-        return 0;
-    }
-
-    char c = shift_pressed ? keymap_shift[cur_scancode] : keymap[cur_scancode];
+    char c = 0;
+    if (cur_scancode < 128)
+        c = IS SHIFT ? keymap_shift[cur_scancode] : keymap[cur_scancode];
     cur_scancode = 0;
     return c;
 }
 
-void getline(char *to, char echo, uint32_t max_len) {
-    uint32_t input = 0;
-    char key = 0;
-    char *start = to;
-
-    while (1) {
-        key = keyboard_receive_key(1);
-
-        if (key == '\n')
-            break;
-        if (key == '\0')
-            continue;
-
-        if (key == '\b') {
-            if (input > 0) {
-                to--;
-                input--;
-                if (echo)
-                    display_print_char_ez('\b');
-            }
-            continue;
-        }
-
-        if ((uint32_t)(to - start) < max_len - 1) {
-            *to++ = key;
-            input++;
-            if (echo)
-                display_print_char_ez(key);
-        }
-    }
-
-    *to = '\0';
+void read_scancode() {
+    if (port_byte_in(0x64) & OBF)
+        cur_scancode = port_byte_in(0x60);
 }
+
+static uint8_t expect_ex = 0;
 
 void kb_callback(registers_t *regs) {
     (void)regs;
-    cur_scancode = port_byte_in(0x60);
-    if (cur_scancode == 0xE0)
-        extended_scancode = port_byte_in(0x60);
-    port_byte_out(0x20, 0x20); // send EOI to master PIC
+    uint8_t byte = port_byte_in(0x60);
+
+    if (byte == 0xE0) {
+        expect_ex = 1;
+        port_byte_out(0x20, 0x20);
+        return;
+    }
+
+    cur_scancode = byte;
+    ex_scancode = expect_ex ? byte : 0;
+    expect_ex = 0;
+
+    if (cur_scancode == 0x2A || cur_scancode == 0x36) // L/R SHIFT down
+        status |= SHIFT;
+    else if (cur_scancode == 0x1D) // L/R CTRL down
+        status |= CTRL;
+    else if (cur_scancode == 0x38) // L/R ALT down
+        status |= ALT;
+    else if (cur_scancode == 0xAA || cur_scancode == 0xB6) // L/R SHIFT up
+        status &= ~SHIFT;
+    else if (cur_scancode == 0x9D) // L/R CTRL up
+        status &= ~CTRL;
+    else if (cur_scancode == 0xB8) // L/R ALT up
+        status &= ~ALT;
+
+    port_byte_out(0x20, 0x20);
 }
 
 void init_keyboard() { register_interrupt_handler(IRQ1, &kb_callback); }
