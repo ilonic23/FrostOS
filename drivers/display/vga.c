@@ -71,6 +71,112 @@ void vga_dac_idx_write_w(uint8_t index) {
 void vga_dac_col_w(uint8_t value) { port_byte_out(DAC_COL_RW, value); }
 uint8_t vga_dac_col_r() { return port_byte_in(DAC_COL_RW); }
 
+// If in mode 3h, copies the 8x16 font
+// Code rewritten from:
+// https://wiki.osdev.org/VGA_Fonts#Get_from_VGA_RAM_directly
+void vga_copy_font(uint8_t *dest) {
+    vga_graph_ctl_w(5, 0); // clear even/odd mode
+    vga_graph_ctl_w(6, 4); // map VGA mem to 0xA0000
+    vga_seq_w(2, 4);       // set bitplane 2
+    vga_seq_w(4, 6);       // clear even/odd mode the other way
+    // copy glyphs
+    for (uint32_t addr = 0xA0000; addr < 0xA0000 + 32 * 256; addr += 32) {
+        for (uint32_t i = 0; i < 16; ++i) {
+            *dest++ = *(uint8_t *)(uintptr_t)(addr + i);
+        }
+    }
+    // restore VGA state to normal operation (mode 3h)
+    vga_seq_w(2, 3);
+    vga_graph_ctl_w(5, 0x10);
+    vga_seq_w(4, 2);
+    vga_graph_ctl_w(6, 0x0E);
+}
+
+void vga_set_mode_13h() {
+    vga_attrib_ctl_w(0x10, 0x41);
+    vga_attrib_ctl_w(0x11, 0x00);
+    vga_attrib_ctl_w(0x12, 0x0F);
+    vga_attrib_ctl_w(0x13, 0x00);
+    vga_attrib_ctl_w(0x14, 0x00);
+    vga_miscout_w(0x63);
+    vga_seq_w(0x01, 0x01);
+    vga_seq_w(0x02, 0x0F);
+    vga_seq_w(0x03, 0x00);
+    vga_seq_w(0x04, 0x0E);
+    vga_graph_ctl_w(0x05, 0x40);
+    vga_graph_ctl_w(0x06, 0x05);
+    vga_remap_crt_ctl();
+    vga_crt_ctl_w(0x00, 0x5F);
+    vga_crt_ctl_w(0x01, 0x4F);
+    vga_crt_ctl_w(0x02, 0x50);
+    vga_crt_ctl_w(0x03, 0x82);
+    vga_crt_ctl_w(0x04, 0x54);
+    vga_crt_ctl_w(0x05, 0x80);
+    vga_crt_ctl_w(0x06, 0xBF);
+    vga_crt_ctl_w(0x07, 0x1F);
+    vga_crt_ctl_w(0x08, 0x00);
+    vga_crt_ctl_w(0x09, 0x41);
+    vga_crt_ctl_w(0x10, 0x9C);
+    vga_crt_ctl_w(0x11, 0x8E);
+    vga_crt_ctl_w(0x12, 0x8F);
+    vga_crt_ctl_w(0x13, 0x28);
+    vga_crt_ctl_w(0x14, 0x40);
+    vga_crt_ctl_w(0x15, 0x96);
+    vga_crt_ctl_w(0x16, 0xB9);
+    vga_crt_ctl_w(0x17, 0xA3);
+    (volatile void)vga_attrib_ctl_r(0x20);
+}
+
+void vga_set_grayscale_cols() {
+    vga_dac_idx_write_w(0);
+    for (int i = 0; i < 256; ++i) {
+        vga_dac_col_w(i >> 2);
+        vga_dac_col_w(i >> 2);
+        vga_dac_col_w(i >> 2);
+    }
+}
+
+void vga_set_xterm_cols() {
+    vga_dac_idx_write_w(0);
+    // Grayscale
+    // for (int i = 0; i < 256; ++i) {
+    //     vga_dac_col_w(i >> 2);
+    //     vga_dac_col_w(i >> 2);
+    //     vga_dac_col_w(i >> 2);
+    // }
+    int i;
+    for (i = 0; i < 16; ++i) {
+        uint8_t bit0 = (i & (1u << 0)) >> 0;
+        uint8_t bit1 = (i & (1u << 1)) >> 1;
+        uint8_t bit2 = (i & (1u << 2)) >> 2;
+        uint8_t bit3 = (i & (1u << 4)) >> 4;
+        if (i < 8) {
+            vga_dac_col_w(bit2 ? 43 : 0);                 // 170/255*64 ~= 43;
+            vga_dac_col_w(i == 6 ? 21 : (bit1 ? 43 : 0)); // 85/255*64 ~= 21;
+            vga_dac_col_w(bit0 ? 43 : 0);
+        } else {
+            vga_dac_col_w(bit2 ? 63 : 21);
+            vga_dac_col_w(bit1 ? 63 : 21);
+            vga_dac_col_w(bit0 ? 63 : 21);
+        }
+    }
+    for (; i < 232; ++i) {
+        int t = i - 16;
+        int r_idx = t / 36;
+        int g_idx = (t % 36) / 6;
+        int b_idx = t % 6;
+
+        vga_dac_col_w((r_idx * 51) / 4); // idx(0-5) -> 0-255 -> 0-63
+        vga_dac_col_w((g_idx * 51) / 4);
+        vga_dac_col_w((b_idx * 51) / 4);
+    }
+    for (int j = 0; i < 256; ++i, j++) {
+        vga_dac_col_w(j * 3);
+        vga_dac_col_w(j * 3);
+        vga_dac_col_w(j * 3);
+    }
+}
+
 int get_offset_row(int offset);
 int get_offset_col(int offset);
 static int print_char(char c, int col, int row, char attr);

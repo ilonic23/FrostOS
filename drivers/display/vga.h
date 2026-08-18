@@ -9,6 +9,11 @@
 #define VGA_REG_SCREEN_CTRL 0x3D4
 #define VGA_REG_SCREEN_DATA 0x3D5
 
+#include <stdint.h>
+
+void vga_set_mode_13h();
+void vga_set_grayscale_cols();
+void vga_set_xterm_cols();
 void vga_clear_screen();
 void vga_print(char *str);
 void vga_print_at(char *str, int col, int row);
@@ -16,9 +21,9 @@ void vga_print_at_attr(char *str, int col, int row, char attr);
 void vga_print_char(char str);
 void vga_print_attr(char *str, char attr);
 void vga_print_backspace();
-int  vga_get_cursor_offset();
+int vga_get_cursor_offset();
 void vga_set_cursor_offset(int offset);
-int  vga_get_offset(int col, int row);
+int vga_get_offset(int col, int row);
 
 enum {
     BLACK_FG = 0x00,
