@@ -1,4 +1,5 @@
 #include "display.h"
+#include "../../libc/mem.h"
 #include "../../multiboot/multiboot.h"
 
 static framebuffer_info fbi;
@@ -101,7 +102,7 @@ void display_print_char(char c, int32_t x, int32_t y) {
     if (cursor_y >= fbi.height) {
         cursor_y = 0;
         cursor_x = 0;
-        display_clear_screen(col_bg);
+        display_clear_screen();
     }
 }
 
