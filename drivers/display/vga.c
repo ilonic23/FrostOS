@@ -3,6 +3,74 @@
 #include "../../libc/mem.h"
 #include <stdint.h>
 
+#define ATTRIB_CTL_W 0x3C0
+#define ATTRIB_CTL_R 0x3C1
+#define MISCOUT_W 0x3C2
+#define MISCOUT_R 0x3CC
+#define SEQ_RW 0x3C4
+#define GRAPH_CTL_RW 0x3CE
+#define CRT_CTL_RW 0x3D4
+#define DAC_MASK_RW 0x3C6
+#define DAC_IDX_READ_W 0x3C7
+#define DAC_IDX_WRITE_W 0x3C8
+#define DAC_COL_RW 0x3C9
+
+void vga_attrib_ctl_w(uint8_t index, uint8_t value) {
+    // reset index/value state
+    (volatile void)port_byte_in(0x3DA);
+    port_byte_out(ATTRIB_CTL_W, index);
+    port_byte_out(ATTRIB_CTL_W, value);
+}
+uint8_t vga_attrib_ctl_r(uint8_t index) {
+    (volatile void)port_byte_in(0x3DA);
+    port_byte_out(ATTRIB_CTL_W, index);
+    return port_byte_in(ATTRIB_CTL_R);
+}
+
+void vga_miscout_w(uint8_t value) { port_byte_out(MISCOUT_W, value); }
+uint8_t vga_miscout_r() { return port_byte_in(MISCOUT_R); }
+
+// remap CRT_CTL_RW from 0x3B4 to 0x3D4
+void vga_remap_crt_ctl() {
+    uint8_t miscout = vga_miscout_r();
+    miscout |= (1u << 0);
+    vga_miscout_w(miscout);
+}
+
+void vga_seq_w(uint8_t index, uint8_t value) {
+    port_word_out(SEQ_RW, ((uint16_t)value) << 8 | (uint16_t)index);
+}
+uint8_t vga_seq_r(uint8_t index) {
+    port_byte_out(SEQ_RW, index);
+    return port_byte_in(SEQ_RW + 1);
+}
+
+void vga_graph_ctl_w(uint8_t index, uint8_t value) {
+    port_word_out(GRAPH_CTL_RW, ((uint16_t)value) << 8 | (uint16_t)index);
+}
+uint8_t vga_graph_ctl_r(uint8_t index) {
+    port_byte_out(GRAPH_CTL_RW, index);
+    return port_byte_in(GRAPH_CTL_RW + 1);
+}
+
+void vga_crt_ctl_w(uint8_t index, uint8_t value) {
+    port_word_out(CRT_CTL_RW, ((uint16_t)value) << 8 | (uint16_t)index);
+}
+uint8_t vga_crt_ctl_r(uint8_t index) {
+    port_byte_out(CRT_CTL_RW, index);
+    return port_byte_in(CRT_CTL_RW + 1);
+}
+
+void vga_dac_mask_w(uint8_t value) { port_byte_out(DAC_MASK_RW, value); }
+uint8_t vga_dac_mask_r() { return port_byte_in(DAC_MASK_RW); }
+
+void vga_dac_idx_read_w(uint8_t index) { port_byte_out(DAC_IDX_READ_W, index); }
+void vga_dac_idx_write_w(uint8_t index) {
+    port_byte_out(DAC_IDX_WRITE_W, index);
+}
+void vga_dac_col_w(uint8_t value) { port_byte_out(DAC_COL_RW, value); }
+uint8_t vga_dac_col_r() { return port_byte_in(DAC_COL_RW); }
+
 int get_offset_row(int offset);
 int get_offset_col(int offset);
 static int print_char(char c, int col, int row, char attr);
