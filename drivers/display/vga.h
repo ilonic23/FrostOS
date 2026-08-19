@@ -11,9 +11,13 @@
 
 #include <stdint.h>
 
+void vga_copy_font(volatile uint8_t *dest);
 void vga_set_mode_13h();
 void vga_set_grayscale_cols();
 void vga_set_xterm_cols();
+void vga_put_pixel(uint32_t x, uint32_t y, uint8_t color);
+void vga_fill_rect(uint32_t x, uint32_t y, uint32_t width, uint32_t height,
+                   uint8_t color);
 void vga_clear_screen();
 void vga_print(char *str);
 void vga_print_at(char *str, int col, int row);
