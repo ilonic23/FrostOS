@@ -1,5 +1,6 @@
 #include "vga.h"
 #include "../../cpu/ports.h"
+#include "../../kernel/debug.h"
 #include "../../libc/mem.h"
 #include <stdint.h>
 
@@ -15,7 +16,7 @@
 #define DAC_IDX_WRITE_W 0x3C8
 #define DAC_COL_RW 0x3C9
 
-static uint32_t scr_width = 25, scr_height = 80;
+static uint32_t scr_width = 80, scr_height = 25;
 static uint8_t col_max = 16;
 static uint8_t *base_addr = (uint8_t *)(uintptr_t)0xB8000;
 static uint8_t mode = 0x3;
@@ -104,6 +105,61 @@ void vga_copy_font(volatile uint8_t *dest) {
     vga_graph_ctl_w(0x06, gc6);
 }
 
+void vga_set_font(uint8_t *font) {
+    vga_seq_w(0x02, 0x04); // map mask: plane 2 only
+    vga_seq_w(
+        0x04,
+        0x06); // disable odd/even, enable extended memory (linear plane access)
+    vga_graph_ctl_w(0x05, 0x00); // disable odd/even on read side
+    vga_graph_ctl_w(0x06, 0x04); // map to 0xA0000, no odd/even
+    memcpy((uint8_t *)(uintptr_t)0xA0000, font, 256 * 16);
+
+    vga_seq_w(0x02, 0x0F);
+    vga_seq_w(0x04, 0x02);
+    vga_graph_ctl_w(0x05, 0x10);
+    vga_graph_ctl_w(0x06, 0x0E);
+}
+
+void vga_set_mode_3h() {
+    vga_attrib_ctl_w(0x10, 0x0C);
+    vga_attrib_ctl_w(0x11, 0x00);
+    vga_attrib_ctl_w(0x12, 0x0F);
+    vga_attrib_ctl_w(0x13, 0x08);
+    vga_attrib_ctl_w(0x14, 0x00);
+    vga_miscout_w(0x67);
+    vga_seq_w(0x01, 0x01);
+    vga_seq_w(0x02, 0x0F);
+    vga_seq_w(0x03, 0x03);
+    vga_seq_w(0x04, 0x02); // 0x2 / 0x7 ???
+    vga_graph_ctl_w(0x05, 0x10);
+    vga_graph_ctl_w(0x06, 0x0E);
+    vga_remap_crt_ctl();
+    vga_crt_ctl_w(0x00, 0x5F);
+    vga_crt_ctl_w(0x01, 0x4F);
+    vga_crt_ctl_w(0x02, 0x50);
+    vga_crt_ctl_w(0x03, 0x82);
+    vga_crt_ctl_w(0x04, 0x55);
+    vga_crt_ctl_w(0x05, 0x81);
+    vga_crt_ctl_w(0x06, 0xBF);
+    vga_crt_ctl_w(0x07, 0x1F);
+    vga_crt_ctl_w(0x08, 0x00);
+    vga_crt_ctl_w(0x09, 0x4F);
+    vga_crt_ctl_w(0x10, 0x9C);
+    vga_crt_ctl_w(0x11, 0x8E);
+    vga_crt_ctl_w(0x12, 0x8F);
+    vga_crt_ctl_w(0x13, 0x28);
+    vga_crt_ctl_w(0x14, 0x1F);
+    vga_crt_ctl_w(0x15, 0x96);
+    vga_crt_ctl_w(0x16, 0xB9);
+    vga_crt_ctl_w(0x17, 0xA3);
+    (volatile void)vga_attrib_ctl_r(0x20);
+    scr_width = 80;
+    scr_height = 25;
+    col_max = 15;
+    base_addr = (uint8_t *)(uintptr_t)0xB8000;
+    mode = 0x03;
+}
+
 void vga_set_mode_13h() {
     vga_attrib_ctl_w(0x10, 0x41);
     vga_attrib_ctl_w(0x11, 0x00);
@@ -188,6 +244,23 @@ void vga_set_xterm_cols() {
     }
 }
 
+void vga_set_text_colors() {
+    static const uint8_t palette[16][3] = {
+        {0x00, 0x00, 0x00}, {0x00, 0x00, 0x2A}, {0x00, 0x2A, 0x00},
+        {0x00, 0x2A, 0x2A}, {0x2A, 0x00, 0x00}, {0x2A, 0x00, 0x2A},
+        {0x2A, 0x15, 0x00}, {0x2A, 0x2A, 0x2A}, {0x15, 0x15, 0x15},
+        {0x15, 0x15, 0x3F}, {0x15, 0x3F, 0x15}, {0x15, 0x3F, 0x3F},
+        {0x3F, 0x15, 0x15}, {0x3F, 0x15, 0x3F}, {0x3F, 0x3F, 0x15},
+        {0x3F, 0x3F, 0x3F},
+    };
+    vga_dac_idx_write_w(0);
+    for (int i = 0; i < 16; ++i) {
+        vga_dac_col_w(palette[i][0]);
+        vga_dac_col_w(palette[i][1]);
+        vga_dac_col_w(palette[i][2]);
+    }
+}
+
 void vga_put_pixel(uint32_t x, uint32_t y, uint8_t color) {
     if (x >= scr_width || y >= scr_height)
         return;
@@ -195,7 +268,7 @@ void vga_put_pixel(uint32_t x, uint32_t y, uint8_t color) {
         base_addr[y * scr_width + x] = color;
     else if (mode == 0x3) {
         int offset = (y * scr_width + x) * 2;
-        base_addr[offset] = ' ';
+        base_addr[offset] = '\0';
         base_addr[offset + 1] = color;
     }
 }
