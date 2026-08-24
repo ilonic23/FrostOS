@@ -4,9 +4,9 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "framebuffer.h"
-// #include "../../drivers/vga.h"
 #include "../../multiboot/multiboot.h"
+#include "framebuffer.h"
+#include "vga.h"
 
 typedef struct {
     uint8_t r;
@@ -18,6 +18,7 @@ typedef struct {
     (display_color) {                                                          \
         .r = (blue), .g = (red), .b = (green)                                  \
     } // There's a weird bug that text colors appear right only so.
+#define VGA_COLOR(c) DISPLAY_COLOR(c, c, c)
 
 typedef struct {
     uint8_t *glyphs;
@@ -27,7 +28,8 @@ typedef struct {
     uint8_t map[255];
 } display_font;
 
-void display_init(multiboot_info_t *mbi);
+void display_init_fb(multiboot_info_t *mbi);
+void display_init_vga(vga_info_t *info);
 void display_put_pixel(uint32_t x, uint32_t y, display_color color);
 void display_fill_rect(uint32_t x, uint32_t y, uint32_t width, uint32_t height,
                        display_color color);

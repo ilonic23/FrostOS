@@ -9,19 +9,31 @@
 #define VGA_REG_SCREEN_CTRL 0x3D4
 #define VGA_REG_SCREEN_DATA 0x3D5
 
+#include <stddef.h>
 #include <stdint.h>
 
+typedef struct {
+    uint32_t width;
+    uint32_t height;
+    uint8_t *base_addr;
+    uint8_t mode;
+} vga_info_t;
+
+vga_info_t vga_init(uint8_t mode);
 void vga_copy_font(volatile uint8_t *dest);
 void vga_set_font(uint8_t *font);
-void vga_set_mode_13h();
-void vga_set_mode_3h();
+void vga_set_mode_13h(vga_info_t *info);
+void vga_set_mode_3h(vga_info_t *info);
 void vga_set_grayscale_cols();
 void vga_set_xterm_cols();
 void vga_set_text_colors();
-void vga_put_pixel(uint32_t x, uint32_t y, uint8_t color);
-void vga_fill_rect(uint32_t x, uint32_t y, uint32_t width, uint32_t height,
-                   uint8_t color);
-void vga_clear_screen();
+void vga_put_pixel(vga_info_t *info, uint32_t x, uint32_t y, uint8_t color);
+void vga_fill_rect(vga_info_t *info, uint32_t x, uint32_t y, uint32_t width,
+                   uint32_t height, uint8_t color);
+void vga_put_char(vga_info_t *info, uint8_t *font, size_t char_index,
+                  uint32_t char_width, uint32_t char_height, uint32_t x,
+                  uint32_t y, uint32_t color_fg, uint32_t color_bg);
+void vga_clear_screen(vga_info_t *info, uint8_t color);
 void vga_print(char *str);
 void vga_print_at(char *str, int col, int row);
 void vga_print_at_attr(char *str, int col, int row, char attr);

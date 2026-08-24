@@ -1,8 +1,12 @@
 #include "display.h"
+#include "../../kernel/debug.h"
 #include "../../libc/mem.h"
 #include "../../multiboot/multiboot.h"
+#include "vga.h"
 
 static framebuffer_info fbi;
+static vga_info_t *vi;
+static uint8_t mode; // 0 = vga, 1 = framebuffer
 static uint32_t cursor_x = 0, cursor_y = 0;
 static display_font font;
 static display_color col_fg = DISPLAY_COLOR(255, 255, 255),
@@ -11,43 +15,67 @@ static uint32_t scale = 1;
 
 #define SPACING 4
 
-void display_init(multiboot_info_t *mbi) { fbi = framebuffer_init(mbi); }
+void display_init_fb(multiboot_info_t *mbi) {
+    mode = 1;
+    fbi = framebuffer_init(mbi);
+}
+void display_init_vga(vga_info_t *info) {
+    mode = 0;
+    vi = info;
+}
 
 void display_put_pixel(uint32_t x, uint32_t y, display_color color) {
-    uint32_t c = framebuffer_pack_color(&fbi, color.r, color.g, color.b);
-    framebuffer_put_pixel(&fbi, x, y, c);
+    if (mode) {
+        uint32_t c = framebuffer_pack_color(&fbi, color.r, color.g, color.b);
+        framebuffer_put_pixel(&fbi, x, y, c);
+    } else
+        vga_put_pixel(vi, x, y, color.r);
 }
 
 void display_fill_rect(uint32_t x, uint32_t y, uint32_t width, uint32_t height,
                        display_color color) {
-    uint32_t c = framebuffer_pack_color(&fbi, color.r, color.g, color.b);
-    framebuffer_fill_rect(&fbi, x, y, width, height, c);
+    if (mode) {
+        uint32_t c = framebuffer_pack_color(&fbi, color.r, color.g, color.b);
+        framebuffer_fill_rect(&fbi, x, y, width, height, c);
+    } else
+        vga_fill_rect(vi, x, y, width, height, color.r);
 }
 
 void display_clear_screen() {
-    uint32_t c = framebuffer_pack_color(&fbi, col_bg.r, col_bg.g, col_bg.b);
-    framebuffer_clear_screen(&fbi, c);
+    if (mode) {
+        uint32_t c = framebuffer_pack_color(&fbi, col_bg.r, col_bg.g, col_bg.b);
+        framebuffer_clear_screen(&fbi, c);
+    } else
+        vga_clear_screen(vi, col_bg.r);
     cursor_x = 0;
     cursor_y = 0;
 }
 
 void display_put_char(uint32_t x, uint32_t y, display_font *font,
                       size_t char_index) {
-    uint32_t fg = framebuffer_pack_color(&fbi, 255, 255, 255);
-    uint32_t bg = framebuffer_pack_color(&fbi, 0, 0, 0);
-    framebuffer_put_char(&fbi, font->glyphs, char_index, font->glyph_width,
-                         font->glyph_height, x, y, fg, bg);
+    if (mode) {
+        uint32_t fg = framebuffer_pack_color(&fbi, 255, 255, 255);
+        uint32_t bg = framebuffer_pack_color(&fbi, 0, 0, 0);
+        framebuffer_put_char(&fbi, font->glyphs, char_index, font->glyph_width,
+                             font->glyph_height, x, y, fg, bg);
+    } else
+        vga_put_char(vi, font->glyphs, char_index, font->glyph_width,
+                     font->glyph_height, x, y, WHITE_FG, BLACK_BG);
 }
 
 void display_put_char_ex(uint32_t x, uint32_t y, display_font *font,
                          size_t char_index, display_color color_fg,
                          display_color color_bg) {
-    uint32_t fg =
-        framebuffer_pack_color(&fbi, color_fg.r, color_fg.g, color_fg.b);
-    uint32_t bg =
-        framebuffer_pack_color(&fbi, color_bg.r, color_bg.g, color_bg.b);
-    framebuffer_put_char(&fbi, font->glyphs, char_index, font->glyph_width,
-                         font->glyph_height, x, y, fg, bg);
+    if (mode) {
+        uint32_t fg =
+            framebuffer_pack_color(&fbi, color_fg.r, color_fg.g, color_fg.b);
+        uint32_t bg =
+            framebuffer_pack_color(&fbi, color_bg.r, color_bg.g, color_bg.b);
+        framebuffer_put_char(&fbi, font->glyphs, char_index, font->glyph_width,
+                             font->glyph_height, x, y, fg, bg);
+    } else
+        vga_put_char(vi, font->glyphs, char_index, font->glyph_width,
+                     font->glyph_height, x, y, color_fg.r, color_bg.r);
 }
 
 display_font display_get_font() { return font; }
@@ -71,9 +99,9 @@ void display_set_foreground(display_color color) { col_fg = color; }
 
 void display_set_background(display_color color) { col_bg = color; }
 
-uint32_t display_get_width() { return fbi.width; }
+uint32_t display_get_width() { return (mode) ? fbi.width : vi->width; }
 
-uint32_t display_get_height() { return fbi.height; }
+uint32_t display_get_height() { return (mode) ? fbi.height : vi->height; }
 
 void display_print_char(char c, int32_t x, int32_t y) {
     if (x >= 0 && y >= 0) {
@@ -95,11 +123,11 @@ void display_print_char(char c, int32_t x, int32_t y) {
     }
 
     // Scroll or go to a new line
-    if (cursor_x >= fbi.width) {
+    if (cursor_x >= (mode) ? fbi.width : vi->width) {
         cursor_x = 0;
         cursor_y += font.glyph_height + SPACING;
     }
-    if (cursor_y >= fbi.height) {
+    if (cursor_y >= (mode) ? fbi.height : vi->height) {
         cursor_y = 0;
         cursor_x = 0;
         display_clear_screen();

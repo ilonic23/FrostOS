@@ -16,10 +16,21 @@
 #define DAC_IDX_WRITE_W 0x3C8
 #define DAC_COL_RW 0x3C9
 
-static uint32_t scr_width = 80, scr_height = 25;
-static uint8_t col_max = 16;
-static uint8_t *base_addr = (uint8_t *)(uintptr_t)0xB8000;
-static uint8_t mode = 0x3;
+vga_info_t vga_init(uint8_t mode) {
+    vga_info_t result = {
+        .mode = mode,
+    };
+    if (mode == 0x3) {
+        result.width = 80;
+        result.height = 25;
+        result.base_addr = (uint8_t *)(uintptr_t)0xB8000;
+    } else if (mode == 0x13) {
+        result.width = 320;
+        result.height = 200;
+        result.base_addr = (uint8_t *)(uintptr_t)0xA0000;
+    }
+    return result;
+}
 
 void vga_attrib_ctl_w(uint8_t index, uint8_t value) {
     // reset index/value state
@@ -120,7 +131,7 @@ void vga_set_font(uint8_t *font) {
     vga_graph_ctl_w(0x06, 0x0E);
 }
 
-void vga_set_mode_3h() {
+void vga_set_mode_3h(vga_info_t *info) {
     vga_attrib_ctl_w(0x10, 0x0C);
     vga_attrib_ctl_w(0x11, 0x00);
     vga_attrib_ctl_w(0x12, 0x0F);
@@ -153,14 +164,13 @@ void vga_set_mode_3h() {
     vga_crt_ctl_w(0x16, 0xB9);
     vga_crt_ctl_w(0x17, 0xA3);
     (volatile void)vga_attrib_ctl_r(0x20);
-    scr_width = 80;
-    scr_height = 25;
-    col_max = 15;
-    base_addr = (uint8_t *)(uintptr_t)0xB8000;
-    mode = 0x03;
+    info->width = 80;
+    info->height = 25;
+    info->base_addr = (uint8_t *)(uintptr_t)0xB8000;
+    info->mode = 0x03;
 }
 
-void vga_set_mode_13h() {
+void vga_set_mode_13h(vga_info_t *info) {
     vga_attrib_ctl_w(0x10, 0x41);
     vga_attrib_ctl_w(0x11, 0x00);
     vga_attrib_ctl_w(0x12, 0x0F);
@@ -193,11 +203,10 @@ void vga_set_mode_13h() {
     vga_crt_ctl_w(0x16, 0xB9);
     vga_crt_ctl_w(0x17, 0xA3);
     (volatile void)vga_attrib_ctl_r(0x20);
-    scr_width = 320;
-    scr_height = 200;
-    col_max = 255;
-    base_addr = (uint8_t *)(uintptr_t)0xA0000;
-    mode = 0x13;
+    info->width = 320;
+    info->height = 200;
+    info->base_addr = (uint8_t *)(uintptr_t)0xA0000;
+    info->mode = 0x13;
 }
 
 void vga_set_grayscale_cols() {
@@ -261,23 +270,44 @@ void vga_set_text_colors() {
     }
 }
 
-void vga_put_pixel(uint32_t x, uint32_t y, uint8_t color) {
-    if (x >= scr_width || y >= scr_height)
+void vga_put_pixel(vga_info_t *info, uint32_t x, uint32_t y, uint8_t color) {
+    if (x >= info->width || y >= info->height)
         return;
-    if (mode == 0x13)
-        base_addr[y * scr_width + x] = color;
-    else if (mode == 0x3) {
-        int offset = (y * scr_width + x) * 2;
-        base_addr[offset] = '\0';
-        base_addr[offset + 1] = color;
+    if (info->mode == 0x13)
+        info->base_addr[y * info->width + x] = color;
+    else if (info->mode == 0x3) {
+        int offset = (y * info->width + x) * 2;
+        info->base_addr[offset] = '\0';
+        info->base_addr[offset + 1] = color;
     }
 }
 
-void vga_fill_rect(uint32_t x, uint32_t y, uint32_t width, uint32_t height,
-                   uint8_t color) {
+void vga_fill_rect(vga_info_t *info, uint32_t x, uint32_t y, uint32_t width,
+                   uint32_t height, uint8_t color) {
     for (uint32_t x_new = x; x_new < width + x; ++x_new)
         for (uint32_t y_new = y; y_new < height + y; ++y_new)
-            vga_put_pixel(x_new, y_new, color);
+            vga_put_pixel(info, x_new, y_new, color);
+}
+
+void vga_put_char(vga_info_t *info, uint8_t *font, size_t char_index,
+                  uint32_t char_width, uint32_t char_height, uint32_t x,
+                  uint32_t y, uint32_t color_fg, uint32_t color_bg) {
+    if (info->mode == 0x13) {
+        uint8_t (*fnt)[char_width] = (uint8_t (*)[char_width])font;
+        for (uint32_t row = 0; row < char_height; row++) {
+            unsigned char byte = fnt[char_index][row];
+            for (uint32_t col = 0; col < char_width; col++) {
+                int bit = (byte >> (7 - col)) & 1;
+                int px = x + col;
+                int py = y + row;
+                vga_put_pixel(info, px, py, bit ? color_fg : color_bg);
+            }
+        }
+    } else if (info->mode == 0x3) {
+        int offset = (y * info->width + x) * 2;
+        info->base_addr[offset] = char_index;
+        info->base_addr[offset + 1] = color_fg | color_bg;
+    }
 }
 
 int get_offset_row(int offset);
@@ -389,15 +419,9 @@ static int print_char(char c, int col, int row, char attr) {
     return offset;
 }
 
-// void vga_clear_screen() {
-//     uint8_t *screen = (uint8_t *)VGA_VID_ADDR;
-//
-//     for (int i = 0; i < VGA_MAX_COLS * VGA_MAX_ROWS; ++i) {
-//         screen[i * 2] = ' ';
-//         screen[i * 2 + 1] = BLACK_BG | WHITE_FG;
-//     }
-//     vga_set_cursor_offset(vga_get_offset(0, 0));
-// }
+void vga_clear_screen(vga_info_t *info, uint8_t color) {
+    vga_fill_rect(info, 0, 0, info->width, info->height, color);
+}
 
 int get_offset_row(int offset) { return offset / (2 * VGA_MAX_COLS); }
 int get_offset_col(int offset) {
