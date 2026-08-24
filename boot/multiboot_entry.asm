@@ -2,14 +2,14 @@ section .multiboot
 align 4
 multiboot_header:
     dd 0x1BADB002               ; Magic
-    dd 0x00000007               ; Flags, were 7, not 3
+    dd 0x00000003               ; Flags, 7 - VBE, 3 - VGA
 
-    dd -(0x1BADB002 + 0x00000007) ; Checksum, was 7
+    dd -(0x1BADB002 + 0x00000003) ; Checksum
     times 5 dd 0                ; Address fields
-    dd 0                        ; VBE mode
-    dd 1024                     ; width
-    dd 768                      ; height
-    dd 32                       ; bpp
+    ; dd 0                        ; VBE mode
+    ; dd 1024                     ; width
+    ; dd 768                      ; height
+    ; dd 32                       ; bpp
 
 section .text
 global _start
