@@ -1,16 +1,16 @@
 #ifndef ACPI_H
 #define ACPI_H
 
-#include <stdint.h>
 #include <stddef.h>
+#include <stdint.h>
 
 // https://wiki.osdev.org/RSDP
-typedef struct __attribute__ ((packed)) {
+typedef struct __attribute__((packed)) {
     char Signature[8];
     uint8_t Checksum;
     char OEMID[6];
     uint8_t Revision;
-    uint32_t RsdtAddress;      // deprecated since version 2.0
+    uint32_t RsdtAddress; // deprecated since version 2.0
 
     // XSDP new fields
     uint32_t Length;
@@ -20,7 +20,7 @@ typedef struct __attribute__ ((packed)) {
 } rsdp_t;
 
 // https://wiki.osdev.org/RSDT
-typedef struct __attribute__ ((packed)) {
+typedef struct __attribute__((packed)) {
     char Signature[4];
     uint32_t Length;
     uint8_t Revision;
@@ -32,12 +32,12 @@ typedef struct __attribute__ ((packed)) {
     uint32_t CreatorRevision;
 } sdt_header_t;
 
-typedef struct __attribute__ ((packed)) {
+typedef struct __attribute__((packed)) {
     sdt_header_t header;
     uint32_t other_sdt_ptr[];
 } rsdt_t;
 
-typedef struct __attribute__ ((packed)) {
+typedef struct __attribute__((packed)) {
     sdt_header_t header;
     uint64_t other_sdt_ptr[];
 } xsdt_t;
@@ -121,7 +121,5 @@ uint8_t rsdp_checksum(rsdp_t *ptr, size_t size);
 uint8_t validate_rsdp(rsdp_t *ptr);
 fadt_t *find_fadt(rsdp_t *rsdp);
 void acpi_enable(fadt_t *fadt);
-int parse_slp_from_dsdt(fadt_t *fadt);
-void acpi_shutdown(fadt_t *fadt);
 
 #endif
