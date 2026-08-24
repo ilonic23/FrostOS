@@ -149,7 +149,7 @@ void irq_install() {
     /* Enable interruptions */
     asm volatile("sti");
     /* IRQ0: timer */
-    init_timer(1193); // IRQ0 Interrupt every millisecond.
+    init_timer(1000); // IRQ0 Interrupt every millisecond.
     /* IRQ1: keyboard */
     init_keyboard();
     init_rtc(0x06);
