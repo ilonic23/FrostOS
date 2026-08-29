@@ -2,14 +2,14 @@ section .multiboot
 align 4
 multiboot_header:
     dd 0x1BADB002               ; Magic
-    dd 0x00000003               ; Flags, 7 - VBE, 3 - VGA
+    dd 0x00000007               ; Flags, 7 - VBE, 3 - VGA
 
-    dd -(0x1BADB002 + 0x00000003) ; Checksum
+    dd -(0x1BADB002 + 0x00000007) ; Checksum
     times 5 dd 0                ; Address fields
-    ; dd 0                        ; VBE mode
-    ; dd 1024                     ; width
-    ; dd 768                      ; height
-    ; dd 32                       ; bpp
+    dd 0                        ; VBE mode
+    dd 640                      ; width
+    dd 480                      ; height
+    dd 16                       ; bpp
 
 section .text
 global _start
@@ -29,6 +29,7 @@ _start:
     jmp CODE_SEG:.reload_segments
 
 .reload_segments:
+    mov ecx, eax ; preserve the eax before modifying
     ; 3. Update all data segment registers to 0x10
     mov ax, DATA_SEG
     mov ds, ax
@@ -42,14 +43,14 @@ _start:
     mov ebp, esp
     
     ; 5. Verify multiboot magic (optional but good practice)
-    mov edx, eax            ; Save magic to check
-    and edx, 0xFFFF0000     ; Mask out the lower 16 bits
-    cmp edx, 0x2BAD0000     ; Check if high word is the Multiboot magic
-    jne .hang               ; If not 2BAD, it's not multiboot
+    cmp ecx, 0x2BADB002
+    ; and edx, 0xFFFF0000     ; Mask out the lower 16 bits
+    ; cmp edx, 0x2BAD0000     ; Check if high word is the Multiboot magic
+    jnz .hang               ; If not 2BAD, it's not multiboot
 
     ; 6. Push multiboot parameters and call C kernel
     push ebx                    ; Multiboot info pointer
-    push eax                    ; Multiboot magic
+    push ecx                    ; Multiboot magic
     call kernel_main
     
 .hang:
