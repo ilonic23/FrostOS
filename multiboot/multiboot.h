@@ -30,7 +30,7 @@ typedef struct __attribute__((packed)) {
     // flags bit 7
     uint32_t drives_length;
     uint32_t drives_addr;
-    
+
     // flags bit 8
     uint32_t config_table;
 
@@ -41,27 +41,33 @@ typedef struct __attribute__((packed)) {
     uint32_t apm_table;
 
     // flags bit 11 -- VBE info
-    uint32_t vbe_control_info;   // physical addr of VbeInfoBlock
-    uint32_t vbe_mode_info;      // physical addr of ModeInfoBlock
-    uint16_t vbe_mode;           // current VBE mode number
-    uint16_t vbe_interface_seg;  // PMI: real-mode segment
-    uint16_t vbe_interface_off;  // PMI: offset within segment
-    uint16_t vbe_interface_len;  // PMI: length in bytes
-                                 
+    uint32_t vbe_control_info;  // physical addr of VbeInfoBlock
+    uint32_t vbe_mode_info;     // physical addr of ModeInfoBlock
+    uint16_t vbe_mode;          // current VBE mode number
+    uint16_t vbe_interface_seg; // PMI: real-mode segment
+    uint16_t vbe_interface_off; // PMI: offset within segment
+    uint16_t vbe_interface_len; // PMI: length in bytes
+
     // flags bit 12 -- Framebuffer
     uint64_t framebuffer_addr;
     uint32_t framebuffer_pitch;
     uint32_t framebuffer_width;
     uint32_t framebuffer_height;
-    uint8_t  framebuffer_bpp;
-    uint8_t  framebuffer_type;
+    uint8_t framebuffer_bpp;
+    uint8_t framebuffer_type;
     // color_info
-    uint8_t  framebuffer_red_field_position;
-    uint8_t  framebuffer_red_mask_size;
-    uint8_t  framebuffer_green_field_position;
-    uint8_t  framebuffer_green_mask_size;
-    uint8_t  framebuffer_blue_field_position;
-    uint8_t  framebuffer_blue_mask_size;
+    uint16_t garbage; // For some reason there's an offset by
+                      // two bytes that's missing and the
+                      // `garbage` value is here to fix it.
+                      // These two bytes aren't specified
+                      // anywhere. In Russian, fixes like this
+                      // are named "Костыль", a crutch.
+    uint8_t framebuffer_red_field_position;
+    uint8_t framebuffer_red_mask_size;
+    uint8_t framebuffer_green_field_position;
+    uint8_t framebuffer_green_mask_size;
+    uint8_t framebuffer_blue_field_position;
+    uint8_t framebuffer_blue_mask_size;
 } multiboot_info_t;
 
 typedef struct __attribute__((packed)) {
