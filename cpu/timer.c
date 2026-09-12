@@ -1,28 +1,17 @@
 #include "timer.h"
+#include "../kernel/debug.h"
 #include "isr.h"
 #include "ports.h"
-#include "../libc/function.h"
 
 uint64_t tick = 0;
 static uint64_t pit_freq;
 
 static void timer_callback(registers_t *regs) {
+    (void)regs;
     tick++;
-    // if (tick % 100 == 0) {
-    //     char buf[33];
-    //     void *args[1] = {
-    //         &tick
-    //     };
-    //     strfmt("%u\n", buf, 33, args);
-    //     kprint(buf);
-    // }
-
-    UNUSED(regs);
 }
 
-uint64_t get_tick() {
-    return tick;
-}
+uint64_t get_tick() { return tick; }
 
 void init_timer(uint32_t freq) {
     /* Install the function we just wrote */
@@ -30,21 +19,24 @@ void init_timer(uint32_t freq) {
     // freq = How fast to callback once in ~1 us
     pit_freq = freq;
 
-    /* Get the PIT value: hardware clock at 1193180 Hz */
-    uint32_t divisor = 1193180 / freq;
-    uint8_t low  = (uint8_t)(divisor & 0xFF);
-    uint8_t high = (uint8_t)( (divisor >> 8) & 0xFF);
+    /* Get the PIT value: hardware clock at 1193182 Hz */
+    uint32_t divisor = 1193182 / freq;
+    uint8_t low = (uint8_t)(divisor & 0xFF);
+    uint8_t high = (uint8_t)((divisor >> 8) & 0xFF);
     /* Send the command */
+    asm volatile("cli");
     port_byte_out(0x43, 0x36); /* Command port */
     port_byte_out(0x40, low);
     port_byte_out(0x40, high);
+    asm volatile("sti");
 }
 
 void sleep_ms(uint64_t time_ms) {
     /* Convert requested time to ticks */
     uint64_t ticks_needed = time_ms;
 
-    if (ticks_needed == 0) ticks_needed = 1; // at least 1 tick
+    if (ticks_needed == 0)
+        ticks_needed = 1; // at least 1 tick
 
     uint64_t start_tick = tick;
 
