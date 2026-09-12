@@ -365,7 +365,7 @@ void colors() {
     for (int i = 0; i < 256; ++i) {
         display_fill_rect(i, 0, 1, display_get_width(), VGA_COLOR(i));
     }
-    while (kb_receive_char(1) != '\b')
+    while (kb_is_ctrl())
         ;
 }
 
