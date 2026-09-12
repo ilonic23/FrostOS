@@ -41,6 +41,8 @@
 #define STATUS_DF (1u << 5)
 #define STATUS_BSY (1u << 7)
 
+#define ERR_ABRT (1u << 2)
+
 void ata_400ns_delay(uint16_t io_base, uint16_t ct_base) {
     for (int i = 0; i < 15; ++i) {
         if (i % 2 == 0) {
@@ -106,6 +108,8 @@ int ata_identify(uint8_t secondary, uint8_t slave, ata_drive_t *drive) {
     port_byte_out(io_base + DRV_HEAD_REG, drv);
     ata_400ns_delay(io_base, ct_base);
 
+    // Set count to 0
+    port_byte_out(io_base + SECT_CNT_REG, 0);
     // Set LBAlo, LBAmid, LBAhi to 0
     port_byte_out(io_base + LBA_LO_REG, 0);
     port_byte_out(io_base + LBA_MID_REG, 0);
@@ -121,8 +125,11 @@ int ata_identify(uint8_t secondary, uint8_t slave, ata_drive_t *drive) {
 
     uint8_t is_ata = 1;
 
+    uint32_t i;
     // BSY
-    while ((status = port_byte_in(io_base + STATUS_REG)) & (1u << 7)) {
+    for (i = 0; i < ATTEMPTS &&
+                (status = port_byte_in(io_base + STATUS_REG) & STATUS_BSY);
+         ++i) {
         uint8_t lba_mid = port_byte_in(io_base + LBA_MID_REG);
         uint8_t lba_hi = port_byte_in(io_base + LBA_HI_REG);
 
@@ -131,6 +138,10 @@ int ata_identify(uint8_t secondary, uint8_t slave, ata_drive_t *drive) {
             is_ata = 0;
             break;
         }
+    }
+    if (i >= ATTEMPTS) {
+        ata_trace("BSY timeout on IDENTIFY");
+        return -1;
     }
 
     uint8_t atapi, sata;
@@ -150,12 +161,20 @@ int ata_identify(uint8_t secondary, uint8_t slave, ata_drive_t *drive) {
     }
 
     // DRQ / ERR
-    while (is_ata) {
+    for (i = 0; i < ATTEMPTS; ++i) {
         status = port_byte_in(io_base + STATUS_REG);
-        if (status & (1u << 3))
+        if (status & STATUS_DRQ)
             break;
-        if (status & (1u << 0))
-            return 2; // ERR
+        if (status & STATUS_ERR) {
+            if (port_byte_in(io_base + ERR_REG) & ERR_ABRT) { // ATAPI
+                // TODO: Run ATAPI IDENTIFY PACKET DEVICE
+            } else
+                return 2; // ERR
+        }
+    }
+    if (i >= ATTEMPTS) {
+        ata_trace("BSY timeout on IDENTIFY");
+        return -1;
     }
 
     for (int i = 0; i < 256; ++i)
