@@ -1,10 +1,14 @@
 #include "../drivers/display/display.h"
 #include "../drivers/keyboard.h"
+#include "../drivers/pci.h"
+#include "../drivers/storage/ata.h"
 #include "../libc/ctype.h"
 #include "../libc/mem.h"
 #include "../libc/rand.h"
 #include "../libc/stdio.h"
+#include "../libc/stdlib.h"
 #include "../libc/string.h"
+#include "debug.h"
 #include "kernel.h"
 #include <stdint.h>
 
@@ -84,6 +88,40 @@ double stod(const char *str) {
     return result;
 }
 
+void getline(char *to, char echo, uint32_t max_len) {
+    uint32_t input = 0;
+    char key = 0;
+    char *start = to;
+
+    while (1) {
+        key = kb_receive_char(1);
+
+        if (key == '\n')
+            break;
+        if (key == '\0')
+            continue;
+
+        if (key == '\b') {
+            if (input > 0) {
+                to--;
+                input--;
+                if (echo)
+                    printf("\b");
+            }
+            continue;
+        }
+
+        if ((uint32_t)(to - start) < max_len - 1) {
+            *to++ = key;
+            input++;
+            if (echo)
+                printf("%c", key);
+        }
+    }
+
+    *to = '\0';
+}
+
 uint64_t get_ms() {
     uint32_t low, high;
     asm volatile("mov $3001, %%eax;"
@@ -143,6 +181,18 @@ void beep() {
     asm volatile("mov $3005, %eax;"
                  "int $0x99;");
     sleep(100);
+    asm volatile("mov $3007, %eax;"
+                 "int $0x99;");
+}
+
+void fbeep(uint32_t freq, uint32_t ms) {
+    asm volatile("mov $3006, %%eax;"
+                 "mov %0, %%ebx;"
+                 "int $0x99;"
+                 :
+                 : "r"(freq)
+                 : "eax", "ebx");
+    sleep(ms);
     asm volatile("mov $3007, %eax;"
                  "int $0x99;");
 }
@@ -225,8 +275,8 @@ void memmap() {
             multiboot_mmap_entry_t entry =
                 *(multiboot_mmap_entry_t *)(uintptr_t)(mbi->mmap_addr + i);
             printf("Entry: %d\n", i);
-            printf("Address: 0x%lx Size: %uB Length: %luB Type: ", entry.addr,
-                   entry.size, entry.len);
+            printf("Address: 0x%lx Size: %uB Length: %luKB Type: ", entry.addr,
+                   entry.size, entry.len / 1024);
             switch (entry.type) {
             case MULTIBOOT_MEMORY_AVAILABLE:
                 printf("Available");
@@ -256,28 +306,80 @@ void memmap() {
 
 void driveinfo() {
     for (int i = 0; i < get_kernel_globals()->drives_count; ++i) {
-        printf("Drive %d:\n", i);
-        printf("Size: %u KB ",
-               drive_lba28_sects(&get_kernel_globals()->drives[i]) / 2);
+        ata_drive_t *drive = &get_kernel_globals()->drives[i];
+
+        printf("Drive: %d\n\n", i);
+        char serial_num[21];
+        ata_str_to_c(serial_num, &drive->identify_vals[10], 10);
+        printf("Serial number: %s\n", serial_num);
+        char firmware[9];
+        ata_str_to_c(firmware, &drive->identify_vals[23], 4);
+        printf("Firmware revision: %s\n", firmware);
+        char model[41];
+        ata_str_to_c(model, &drive->identify_vals[27], 20);
+        printf("Model: %s\n", model);
+        printf("Size: %u KB ", ata_get_lba28_sects(drive) / 2);
         printf("Type: ");
-        switch (get_kernel_globals()->drives[i].type) {
-        case DRIVE_NULL:
-            printf("None");
-            break;
-        case DRIVE_ATA:
+        uint8_t ata = drive->flags & (1u << 1);
+        uint8_t atapi = drive->flags & (1u << 2);
+        uint8_t sata = drive->flags & (1u << 3);
+        if (ata)
             printf("ATA IDE");
-            break;
-        case DRIVE_ATA_ATAPI:
+        else if (atapi)
             printf("ATA ATAPI");
-            break;
-        case DRIVE_ATA_SATA:
+        else if (sata)
             printf("ATA SATA");
-            break;
-        default:
-            printf("Unsupported");
-            break;
-        }
-        printf("\n");
+        else
+            printf("None");
+        printf("\n\n");
+    }
+}
+
+void help() {
+    display_set_foreground(DISPLAY_COLOR(0, 255, 0));
+    printf("--- %s Standard Shell Help ---\n",
+           get_kernel_globals()->kernel_name);
+    printf(
+        "echo      - output a line of text\n"
+        "power     - control the power of the machine\n"
+        "beep      - output a sound with the PC Speaker\n"
+        "rand      - output a random number\n"
+        "date      - output current date\n"
+        "time      - output current time\n"
+        "clear     - clear screen\n"
+        "uptime    - output system uptime\n"
+        "osinfo    - output information about the OS\n"
+        "cpuinfo   - output information about the CPU\n"
+        "meminfo   - output how much memory is installed\n"
+        "memmap    - output how BIOS mapped the memory\n"
+        "driveinfo - output information about the installed drives\n"
+        "pciinfo   - list PCI devices\n"
+        "colors    - output some colors. in mode 13h you'll see them\n"
+        "help      - output help\n"
+        "\nSome commands may have arguments. To check for their existence, add "
+        "-h\n");
+    display_set_foreground(DISPLAY_COLOR(255, 255, 255));
+}
+
+void colors() {
+    for (int i = 0; i < 256; ++i) {
+        display_fill_rect(i, 0, 1, display_get_width(), VGA_COLOR(i));
+    }
+    while (kb_receive_char(1) != '\b')
+        ;
+}
+
+void pciinfo() {
+    for (int i = 0; i < get_kernel_globals()->pci_dev_count; ++i) {
+        uint8_t bus =
+            (uint8_t)((get_kernel_globals()->pci_devs[i] >> 8) & 0xFF);
+        uint8_t slot = (uint8_t)(get_kernel_globals()->pci_devs[i] & 0xFF);
+        pci_base_device_header_t header =
+            pci_get_base_device_header(bus, slot, 0x00);
+        printf("Vendor: 0x%X Device: 0x%X Class: 0x%X Subclass: 0x%X ProgIF: "
+               "0x%X\n",
+               header.vendor, header.device_id, header.class_code,
+               header.subclass, header.progif);
     }
 }
 
@@ -286,6 +388,11 @@ void shell() {
     char *arg_buffer = kmalloc(512);
     char **argv = kmalloc(sizeof(char *) * 8);
     int argc;
+
+    for (int i = 0; i < 10; ++i) {
+        fbeep(31 * 4, 20);
+        fbeep(49 * 4, 20);
+    }
 
     while (1) {
         memset(input, 0, 512);
@@ -322,6 +429,12 @@ void shell() {
             memmap();
         else if (strcmp(argv[0], "driveinfo") == 0)
             driveinfo();
+        else if (strcmp(argv[0], "help") == 0)
+            help();
+        else if (strcmp(argv[0], "colors") == 0)
+            colors();
+        else if (strcmp(argv[0], "pciinfo") == 0)
+            pciinfo();
         else {
             display_set_foreground(DISPLAY_COLOR(255, 0, 0));
             printf("Unknown file or command: %s\n", argv[0]);
