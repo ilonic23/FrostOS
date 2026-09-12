@@ -1,20 +1,22 @@
-#include <stdint.h>
-#include "../cpu/ports.h"
 #include "pci.h"
+#include "../cpu/ports.h"
+#include <stdint.h>
 
-// Took from OSDEV: https://wiki.osdev.org/PCI#Configuration_Space_Access_Mechanism_#1
-// offset is in bytes - just a note for me ;)
-uint16_t pci_config_read_word(uint8_t bus, uint8_t slot, uint8_t func, uint8_t offset) {
+// Took from OSDEV:
+// https://wiki.osdev.org/PCI#Configuration_Space_Access_Mechanism_#1 offset is
+// in bytes - just a note for me ;)
+uint16_t pci_config_read_word(uint8_t bus, uint8_t slot, uint8_t func,
+                              uint8_t offset) {
     uint32_t address;
-    uint32_t lbus  = (uint32_t)bus;
+    uint32_t lbus = (uint32_t)bus;
     uint32_t lslot = (uint32_t)slot;
     uint32_t lfunc = (uint32_t)func;
     uint16_t tmp = 0;
-  
+
     // Create configuration address as per Figure 1
-    address = (uint32_t)((lbus << 16) | (lslot << 11) |
-              (lfunc << 8) | (offset & 0xFC) | ((uint32_t)0x80000000));
-  
+    address = (uint32_t)((lbus << 16) | (lslot << 11) | (lfunc << 8) |
+                         (offset & 0xFC) | ((uint32_t)0x80000000));
+
     // Write out the address
     port_dword_out(0xCF8, address);
     // Read in the data
@@ -23,12 +25,11 @@ uint16_t pci_config_read_word(uint8_t bus, uint8_t slot, uint8_t func, uint8_t o
     return tmp;
 }
 
-uint32_t pci_config_read_dword(uint8_t bus, uint8_t slot, uint8_t func, uint8_t offset) {
-    uint32_t address = (1u << 31)
-                     | ((uint32_t)bus  << 16)
-                     | ((uint32_t)slot << 11)
-                     | ((uint32_t)func <<  8)
-                     | (offset & 0xFC);
+uint32_t pci_config_read_dword(uint8_t bus, uint8_t slot, uint8_t func,
+                               uint8_t offset) {
+    uint32_t address = (1u << 31) | ((uint32_t)bus << 16) |
+                       ((uint32_t)slot << 11) | ((uint32_t)func << 8) |
+                       (offset & 0xFC);
 
     port_dword_out(0xCF8, address);
     return port_dword_in(0xCFC);
@@ -43,7 +44,7 @@ uint16_t pci_get_device(uint8_t bus, uint8_t slot) {
     uint32_t vendor_device = pci_config_read_dword(bus, slot, 0, 0);
     uint16_t vendor = (uint16_t)(vendor_device & 0xFFFF);
     if (vendor != 0xFFFF) {
-       return (uint16_t)((vendor_device >> 16) & 0xFFFF);
+        return (uint16_t)((vendor_device >> 16) & 0xFFFF);
     }
     return vendor;
 }
@@ -68,7 +69,8 @@ uint8_t pci_get_revision(uint8_t bus, uint8_t slot) {
     return (uint8_t)(pci_config_read_word(bus, slot, 0, 8) & 0xFF);
 }
 
-pci_base_device_header_t pci_get_base_device_header(uint8_t bus, uint8_t slot, uint8_t func) {
+pci_base_device_header_t pci_get_base_device_header(uint8_t bus, uint8_t slot,
+                                                    uint8_t func) {
     if (pci_get_vendor(bus, slot) == 0xFFFF)
         return (pci_base_device_header_t){.vendor = 0xFFFF};
 
@@ -81,13 +83,14 @@ pci_base_device_header_t pci_get_base_device_header(uint8_t bus, uint8_t slot, u
     return *(pci_base_device_header_t *)result;
 }
 
-pci_standard_device_header_t pci_get_standard_device_header(uint8_t bus, uint8_t slot, uint8_t func) {
+pci_standard_device_header_t
+pci_get_standard_device_header(uint8_t bus, uint8_t slot, uint8_t func) {
     if (pci_get_vendor(bus, slot) == 0xFFFF)
         return (pci_standard_device_header_t){.base_header.vendor = 0xFFFF};
 
-    uint32_t result[sizeof(pci_standard_device_header_t)/4];
-    for (uint32_t i = 0; i < sizeof(pci_standard_device_header_t); i+=4)
-        result[i/4] = pci_config_read_dword(bus, slot, func, i);
+    uint32_t result[sizeof(pci_standard_device_header_t) / 4];
+    for (uint32_t i = 0; i < sizeof(pci_standard_device_header_t); i += 4)
+        result[i / 4] = pci_config_read_dword(bus, slot, func, i);
 
     return *(pci_standard_device_header_t *)result;
 }
