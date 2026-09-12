@@ -36,6 +36,8 @@ legacy functions for now.
 | 3013    | Character | - | - | - | Prints an ASCII character EBX at current position. |
 | 3014    | Pointer to a null terminated string. | - | - | - | Prints an ASCII string pointed by EBX at current position. |
 | 3015    | Cursor X | Cursor Y | - | - | Sets current cursor position. |
+| 3030    | - | - | - | EAX - year EBX - month ECX - day | Returns the current date. |
+| 3031    | - | - | - | EAX - hours EBX - minutes ECX - seconds EDX - milliseconds | Returns the current time. |
 
 ## Datetime:
 The `datetime_t` structure looks like this:
