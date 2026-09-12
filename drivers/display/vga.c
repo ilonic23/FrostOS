@@ -289,6 +289,12 @@ void vga_fill_rect(vga_info_t *info, uint32_t x, uint32_t y, uint32_t width,
             vga_put_pixel(info, x_new, y_new, color);
 }
 
+void vga_scroll(vga_info_t *info, uint32_t y_pixels, uint8_t bg) {
+    memcpy(info->base_addr, info->base_addr + (y_pixels * info->width),
+           (info->height - y_pixels) * info->width);
+    vga_fill_rect(info, 0, info->height - y_pixels, info->width, y_pixels, bg);
+}
+
 void vga_put_char(vga_info_t *info, uint8_t *font, size_t char_index,
                   uint32_t char_width, uint32_t char_height, uint32_t x,
                   uint32_t y, uint32_t color_fg, uint32_t color_bg) {

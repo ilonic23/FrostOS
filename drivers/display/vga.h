@@ -30,6 +30,7 @@ void vga_set_text_colors();
 void vga_put_pixel(vga_info_t *info, uint32_t x, uint32_t y, uint8_t color);
 void vga_fill_rect(vga_info_t *info, uint32_t x, uint32_t y, uint32_t width,
                    uint32_t height, uint8_t color);
+void vga_scroll(vga_info_t *info, uint32_t y_pixels, uint8_t bg);
 void vga_put_char(vga_info_t *info, uint8_t *font, size_t char_index,
                   uint32_t char_width, uint32_t char_height, uint32_t x,
                   uint32_t y, uint32_t color_fg, uint32_t color_bg);
