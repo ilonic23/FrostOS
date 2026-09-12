@@ -111,23 +111,31 @@ void display_print_char(char c, int32_t x, int32_t y) {
 
     if (c == '\n') {
         cursor_y += font.glyph_height + SPACING;
+        if (!mode) {
+            if (cursor_y >= vi->height) {
+                vga_scroll(vi, font.glyph_height + SPACING, col_bg.r);
+                cursor_y -= 3 * (font.glyph_height + SPACING);
+            }
+        }
         cursor_x = 0;
     } else if (c == 0x08 || c == '\b') {
-        cursor_x -= font.glyph_width;
-        display_fill_rect(cursor_x, cursor_y, font.glyph_width,
-                          font.glyph_height, col_bg);
+        if (cursor_x >= font.glyph_width) {
+            cursor_x -= font.glyph_width;
+            display_fill_rect(cursor_x, cursor_y, font.glyph_width,
+                              font.glyph_height, col_bg);
+        }
     } else {
         display_put_char_ex(cursor_x, cursor_y, &font, (uint8_t)c, col_fg,
                             col_bg);
-        cursor_x += font.glyph_width;
+        cursor_x += (vi && vi->mode == 0x3) ? 1 : font.glyph_width;
     }
 
     // Scroll or go to a new line
-    if (cursor_x >= (mode) ? fbi.width : vi->width) {
+    if (cursor_x >= ((mode) ? fbi.width : vi->width)) {
         cursor_x = 0;
         cursor_y += font.glyph_height + SPACING;
     }
-    if (cursor_y >= (mode) ? fbi.height : vi->height) {
+    if (cursor_y >= ((mode) ? fbi.height : vi->height)) {
         cursor_y = 0;
         cursor_x = 0;
         display_clear_screen();

@@ -15,9 +15,7 @@ typedef struct {
 } display_color;
 
 #define DISPLAY_COLOR(red, green, blue)                                        \
-    (display_color) {                                                          \
-        .r = (blue), .g = (red), .b = (green)                                  \
-    } // There's a weird bug that text colors appear right only so.
+    (display_color) { .r = (red), .g = (green), .b = (blue) }
 #define VGA_COLOR(c) DISPLAY_COLOR(c, c, c)
 
 typedef struct {
