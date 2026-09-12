@@ -1,22 +1,17 @@
 { pkgs ? import <nixpkgs> { } }:
 
 pkgs.mkShell {
-  # List the packages required for your development environment
   packages = with pkgs; [
     tinyxxd
     qemu_kvm
-	gnumake
-	gdb
-	coreboot-toolchain.i386
-	grub2
+	  gnumake
+	  gdb
+	  coreboot-toolchain.i386
+	  grub2
     libisoburn
-	# kvmtool
   ];
 
-  # Define environment variables (optional)
   shellHook = ''
     echo "OSDev Shell"
-    fish
-    exit
   '';
 }
