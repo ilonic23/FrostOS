@@ -25,7 +25,7 @@ A hobby 32-bit OS made for self-learning from scratch.
 - KERCALLS via `int 0x99` - a fancy way to say kernel-calls
 
 ## Constraints:
-- This OS will be 32-bit forever... ###### probably.
+- This OS will be 32-bit forever... probably.
 - No paging, only segmentation and/or ASAN when needed.
 - Every release that is being uploaded should atleast display info on screen,
 take input from keyboard, and output sound via PC Speaker.
