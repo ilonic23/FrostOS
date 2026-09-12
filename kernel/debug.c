@@ -4,7 +4,7 @@
 #include "../libc/stdlib.h"
 #include <stdarg.h>
 
-#ifdef KERNEL_DEBUG
+// #ifdef KERNEL_DEBUG
 
 static void qemu_putchar(char c) { port_byte_out(0xE9, c); }
 
@@ -131,4 +131,4 @@ void kernel_trace(char *format, ...) {
     va_end(args);
 }
 
-#endif
+// #endif
