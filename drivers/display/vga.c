@@ -1,8 +1,7 @@
-#include "vga.h"
-#include "../../cpu/ports.h"
-#include "../../kernel/debug.h"
 #include "../../libc/mem.h"
-#include <stdint.h>
+#include <kor/ll/port.h>
+#include <kor/output/vga.h>
+#include <kor/types.h>
 
 #define ATTRIB_CTL_W 0x3C0
 #define ATTRIB_CTL_R 0x3C1
@@ -16,86 +15,84 @@
 #define DAC_IDX_WRITE_W 0x3C8
 #define DAC_COL_RW 0x3C9
 
-vga_info_t vga_init(uint8_t mode) {
+vga_info_t vga_init(u8 mode) {
     vga_info_t result = {
         .mode = mode,
     };
     if (mode == 0x3) {
         result.width = 80;
         result.height = 25;
-        result.base_addr = (uint8_t *)(uintptr_t)0xB8000;
+        result.base_addr = (u8 *)0xB8000;
     } else if (mode == 0x13) {
         result.width = 320;
         result.height = 200;
-        result.base_addr = (uint8_t *)(uintptr_t)0xA0000;
+        result.base_addr = (u8 *)0xA0000;
     }
     return result;
 }
 
-void vga_attrib_ctl_w(uint8_t index, uint8_t value) {
+void vga_attrib_ctl_w(u8 index, u8 value) {
     // reset index/value state
-    (volatile void)port_byte_in(0x3DA);
-    port_byte_out(ATTRIB_CTL_W, index);
-    port_byte_out(ATTRIB_CTL_W, value);
+    (volatile void)inb(0x3DA);
+    outb(ATTRIB_CTL_W, index);
+    outb(ATTRIB_CTL_W, value);
 }
-uint8_t vga_attrib_ctl_r(uint8_t index) {
-    (volatile void)port_byte_in(0x3DA);
-    port_byte_out(ATTRIB_CTL_W, index);
-    return port_byte_in(ATTRIB_CTL_R);
+u8 vga_attrib_ctl_r(u8 index) {
+    (volatile void)inb(0x3DA);
+    outb(ATTRIB_CTL_W, index);
+    return inb(ATTRIB_CTL_R);
 }
 
-void vga_miscout_w(uint8_t value) { port_byte_out(MISCOUT_W, value); }
-uint8_t vga_miscout_r() { return port_byte_in(MISCOUT_R); }
+void vga_miscout_w(u8 value) { outb(MISCOUT_W, value); }
+u8 vga_miscout_r() { return inb(MISCOUT_R); }
 
 // remap CRT_CTL_RW from 0x3B4 to 0x3D4
 void vga_remap_crt_ctl() {
-    uint8_t miscout = vga_miscout_r();
+    u8 miscout = vga_miscout_r();
     miscout |= (1u << 0);
     vga_miscout_w(miscout);
 }
 
-void vga_seq_w(uint8_t index, uint8_t value) {
-    port_word_out(SEQ_RW, ((uint16_t)value) << 8 | (uint16_t)index);
+void vga_seq_w(u8 index, u8 value) {
+    outw(SEQ_RW, ((u16)value) << 8 | (u16)index);
 }
-uint8_t vga_seq_r(uint8_t index) {
-    port_byte_out(SEQ_RW, index);
-    return port_byte_in(SEQ_RW + 1);
-}
-
-void vga_graph_ctl_w(uint8_t index, uint8_t value) {
-    port_word_out(GRAPH_CTL_RW, ((uint16_t)value) << 8 | (uint16_t)index);
-}
-uint8_t vga_graph_ctl_r(uint8_t index) {
-    port_byte_out(GRAPH_CTL_RW, index);
-    return port_byte_in(GRAPH_CTL_RW + 1);
+u8 vga_seq_r(u8 index) {
+    outb(SEQ_RW, index);
+    return inb(SEQ_RW + 1);
 }
 
-void vga_crt_ctl_w(uint8_t index, uint8_t value) {
-    port_word_out(CRT_CTL_RW, ((uint16_t)value) << 8 | (uint16_t)index);
+void vga_graph_ctl_w(u8 index, u8 value) {
+    outw(GRAPH_CTL_RW, ((u16)value) << 8 | (u16)index);
 }
-uint8_t vga_crt_ctl_r(uint8_t index) {
-    port_byte_out(CRT_CTL_RW, index);
-    return port_byte_in(CRT_CTL_RW + 1);
+u8 vga_graph_ctl_r(u8 index) {
+    outb(GRAPH_CTL_RW, index);
+    return inb(GRAPH_CTL_RW + 1);
 }
 
-void vga_dac_mask_w(uint8_t value) { port_byte_out(DAC_MASK_RW, value); }
-uint8_t vga_dac_mask_r() { return port_byte_in(DAC_MASK_RW); }
-
-void vga_dac_idx_read_w(uint8_t index) { port_byte_out(DAC_IDX_READ_W, index); }
-void vga_dac_idx_write_w(uint8_t index) {
-    port_byte_out(DAC_IDX_WRITE_W, index);
+void vga_crt_ctl_w(u8 index, u8 value) {
+    outw(CRT_CTL_RW, ((u16)value) << 8 | (u16)index);
 }
-void vga_dac_col_w(uint8_t value) { port_byte_out(DAC_COL_RW, value); }
-uint8_t vga_dac_col_r() { return port_byte_in(DAC_COL_RW); }
+u8 vga_crt_ctl_r(u8 index) {
+    outb(CRT_CTL_RW, index);
+    return inb(CRT_CTL_RW + 1);
+}
+
+void vga_dac_mask_w(u8 value) { outb(DAC_MASK_RW, value); }
+u8 vga_dac_mask_r() { return inb(DAC_MASK_RW); }
+
+void vga_dac_idx_read_w(u8 index) { outb(DAC_IDX_READ_W, index); }
+void vga_dac_idx_write_w(u8 index) { outb(DAC_IDX_WRITE_W, index); }
+void vga_dac_col_w(u8 value) { outb(DAC_COL_RW, value); }
+u8 vga_dac_col_r() { return inb(DAC_COL_RW); }
 
 // If in mode 3h, copies the 8x16 font
 // Code rewritten from:
 // https://wiki.osdev.org/VGA_Fonts#Get_from_VGA_RAM_directly
-void vga_copy_font(volatile uint8_t *dest) {
-    uint8_t seq2 = vga_seq_r(0x02), seq4 = vga_seq_r(0x04);
-    uint8_t gc4 = vga_graph_ctl_r(0x04);
-    uint8_t gc5 = vga_graph_ctl_r(0x05);
-    uint8_t gc6 = vga_graph_ctl_r(0x06);
+void vga_copy_font(volatile u8 *dest) {
+    u8 seq2 = vga_seq_r(0x02), seq4 = vga_seq_r(0x04);
+    u8 gc4 = vga_graph_ctl_r(0x04);
+    u8 gc5 = vga_graph_ctl_r(0x05);
+    u8 gc6 = vga_graph_ctl_r(0x06);
 
     vga_seq_w(0x02, 0x04);
     vga_seq_w(0x04, seq4 | 0x04);
@@ -104,7 +101,7 @@ void vga_copy_font(volatile uint8_t *dest) {
     vga_graph_ctl_w(0x05, gc5 & ~0x10);
     vga_graph_ctl_w(0x06, (gc6 & ~0x0C) | 0x04);
 
-    uint8_t *vga_mem = (uint8_t *)(uintptr_t)0xA0000;
+    u8 *vga_mem = (u8 *)0xA0000;
     for (int i = 0; i < 256; ++i)
         for (int row = 0; row < 16; ++row)
             dest[i * 16 + row] = vga_mem[i * 32 + row];
@@ -116,14 +113,14 @@ void vga_copy_font(volatile uint8_t *dest) {
     vga_graph_ctl_w(0x06, gc6);
 }
 
-void vga_set_font(uint8_t *font) {
+void vga_set_font(u8 *font) {
     vga_seq_w(0x02, 0x04); // map mask: plane 2 only
     vga_seq_w(
         0x04,
         0x06); // disable odd/even, enable extended memory (linear plane access)
     vga_graph_ctl_w(0x05, 0x00); // disable odd/even on read side
     vga_graph_ctl_w(0x06, 0x04); // map to 0xA0000, no odd/even
-    memcpy((uint8_t *)(uintptr_t)0xA0000, font, 256 * 16);
+    memcpy((u8 *)0xA0000, font, 256 * 16);
 
     vga_seq_w(0x02, 0x0F);
     vga_seq_w(0x04, 0x02);
@@ -166,7 +163,7 @@ void vga_set_mode_3h(vga_info_t *info) {
     (volatile void)vga_attrib_ctl_r(0x20);
     info->width = 80;
     info->height = 25;
-    info->base_addr = (uint8_t *)(uintptr_t)0xB8000;
+    info->base_addr = (u8 *)0xB8000;
     info->mode = 0x03;
 }
 
@@ -205,7 +202,7 @@ void vga_set_mode_13h(vga_info_t *info) {
     (volatile void)vga_attrib_ctl_r(0x20);
     info->width = 320;
     info->height = 200;
-    info->base_addr = (uint8_t *)(uintptr_t)0xA0000;
+    info->base_addr = (u8 *)0xA0000;
     info->mode = 0x13;
 }
 
@@ -222,10 +219,9 @@ void vga_set_xterm_cols() {
     vga_dac_idx_write_w(0);
     int i;
     for (i = 0; i < 16; ++i) {
-        uint8_t bit0 = (i & (1u << 0)) >> 0;
-        uint8_t bit1 = (i & (1u << 1)) >> 1;
-        uint8_t bit2 = (i & (1u << 2)) >> 2;
-        uint8_t bit3 = (i & (1u << 4)) >> 4;
+        u8 bit0 = (i & (1u << 0)) >> 0;
+        u8 bit1 = (i & (1u << 1)) >> 1;
+        u8 bit2 = (i & (1u << 2)) >> 2;
         if (i < 8) {
             vga_dac_col_w(bit2 ? 43 : 0);                 // 170/255*64 ~= 43;
             vga_dac_col_w(i == 6 ? 21 : (bit1 ? 43 : 0)); // 85/255*64 ~= 21;
@@ -254,7 +250,7 @@ void vga_set_xterm_cols() {
 }
 
 void vga_set_text_colors() {
-    static const uint8_t palette[16][3] = {
+    static const u8 palette[16][3] = {
         {0x00, 0x00, 0x00}, {0x00, 0x00, 0x2A}, {0x00, 0x2A, 0x00},
         {0x00, 0x2A, 0x2A}, {0x2A, 0x00, 0x00}, {0x2A, 0x00, 0x2A},
         {0x2A, 0x15, 0x00}, {0x2A, 0x2A, 0x2A}, {0x15, 0x15, 0x15},
@@ -270,7 +266,7 @@ void vga_set_text_colors() {
     }
 }
 
-void vga_put_pixel(vga_info_t *info, uint32_t x, uint32_t y, uint8_t color) {
+void vga_put_pixel(vga_info_t *info, u32 x, u32 y, u8 color) {
     if (x >= info->width || y >= info->height)
         return;
     if (info->mode == 0x13)
@@ -282,27 +278,26 @@ void vga_put_pixel(vga_info_t *info, uint32_t x, uint32_t y, uint8_t color) {
     }
 }
 
-void vga_fill_rect(vga_info_t *info, uint32_t x, uint32_t y, uint32_t width,
-                   uint32_t height, uint8_t color) {
-    for (uint32_t x_new = x; x_new < width + x; ++x_new)
-        for (uint32_t y_new = y; y_new < height + y; ++y_new)
+void vga_fill_rect(vga_info_t *info, u32 x, u32 y, u32 width, u32 height,
+                   u8 color) {
+    for (u32 x_new = x; x_new < width + x; ++x_new)
+        for (u32 y_new = y; y_new < height + y; ++y_new)
             vga_put_pixel(info, x_new, y_new, color);
 }
 
-void vga_scroll(vga_info_t *info, uint32_t y_pixels, uint8_t bg) {
+void vga_scroll(vga_info_t *info, u32 y_pixels, u8 bg) {
     memcpy(info->base_addr, info->base_addr + (y_pixels * info->width),
            (info->height - y_pixels) * info->width);
     vga_fill_rect(info, 0, info->height - y_pixels, info->width, y_pixels, bg);
 }
 
-void vga_put_char(vga_info_t *info, uint8_t *font, size_t char_index,
-                  uint32_t char_width, uint32_t char_height, uint32_t x,
-                  uint32_t y, uint32_t color_fg, uint32_t color_bg) {
+void vga_put_char(vga_info_t *info, u8 *font, size char_index, u32 char_width,
+                  u32 char_height, u32 x, u32 y, u32 color_fg, u32 color_bg) {
     if (info->mode == 0x13) {
-        uint8_t (*fnt)[char_width] = (uint8_t (*)[char_width])font;
-        for (uint32_t row = 0; row < char_height; row++) {
+        u8(*fnt)[char_width] = (u8(*)[char_width])font;
+        for (u32 row = 0; row < char_height; row++) {
             unsigned char byte = fnt[char_index][row];
-            for (uint32_t col = 0; col < char_width; col++) {
+            for (u32 col = 0; col < char_width; col++) {
                 int bit = (byte >> (7 - col)) & 1;
                 int px = x + col;
                 int py = y + row;
@@ -358,26 +353,26 @@ void vga_print_backspace() {
 }
 
 int vga_get_cursor_offset() {
-    port_byte_out(VGA_REG_SCREEN_CTRL, 14);
-    int offset = port_byte_in(VGA_REG_SCREEN_DATA) << 8;
-    port_byte_out(VGA_REG_SCREEN_CTRL, 15);
-    offset += port_byte_in(VGA_REG_SCREEN_DATA);
+    outb(VGA_REG_SCREEN_CTRL, 14);
+    int offset = inb(VGA_REG_SCREEN_DATA) << 8;
+    outb(VGA_REG_SCREEN_CTRL, 15);
+    offset += inb(VGA_REG_SCREEN_DATA);
     return offset * 2;
 }
 
 void vga_set_cursor_offset(int offset) {
     // Similar to get_cursor_offset, but instead of reading we write data
     offset /= 2;
-    port_byte_out(VGA_REG_SCREEN_CTRL, 14);
-    port_byte_out(VGA_REG_SCREEN_DATA, (uint8_t)(offset >> 8));
-    port_byte_out(VGA_REG_SCREEN_CTRL, 15);
-    port_byte_out(VGA_REG_SCREEN_DATA, (uint8_t)(offset & 0xff));
+    outb(VGA_REG_SCREEN_CTRL, 14);
+    outb(VGA_REG_SCREEN_DATA, (u8)(offset >> 8));
+    outb(VGA_REG_SCREEN_CTRL, 15);
+    outb(VGA_REG_SCREEN_DATA, (u8)(offset & 0xff));
 }
 
 int vga_get_offset(int col, int row) { return 2 * (row * VGA_MAX_COLS + col); }
 
 static int print_char(char c, int col, int row, char attr) {
-    uint8_t *screen = (uint8_t *)VGA_VID_ADDR;
+    u8 *screen = (u8 *)VGA_VID_ADDR;
     if (!attr)
         attr = BLACK_BG | WHITE_FG;
 
@@ -409,12 +404,12 @@ static int print_char(char c, int col, int row, char attr) {
     // Check if the offset is over screen size and roll
     if (offset >= VGA_MAX_ROWS * VGA_MAX_COLS * 2) {
         for (int i = 1; i < VGA_MAX_ROWS; ++i)
-            memcpy((uint8_t *)(vga_get_offset(0, i - 1) + VGA_VID_ADDR),
-                   (uint8_t *)(vga_get_offset(0, i) + VGA_VID_ADDR),
+            memcpy((u8 *)(vga_get_offset(0, i - 1) + VGA_VID_ADDR),
+                   (u8 *)(vga_get_offset(0, i) + VGA_VID_ADDR),
                    VGA_MAX_COLS * 2);
 
-        char *last_line = (char *)(vga_get_offset(0, VGA_MAX_ROWS - 1) +
-                                   (uint8_t *)VGA_VID_ADDR);
+        char *last_line =
+            (char *)(vga_get_offset(0, VGA_MAX_ROWS - 1) + (u8 *)VGA_VID_ADDR);
 
         for (int i = 0; i < VGA_MAX_COLS * 2; ++i)
             last_line[i] = 0;
@@ -425,7 +420,7 @@ static int print_char(char c, int col, int row, char attr) {
     return offset;
 }
 
-void vga_clear_screen(vga_info_t *info, uint8_t color) {
+void vga_clear_screen(vga_info_t *info, u8 color) {
     vga_fill_rect(info, 0, 0, info->width, info->height, color);
 }
 
