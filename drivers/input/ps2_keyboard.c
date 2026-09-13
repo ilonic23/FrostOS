@@ -53,7 +53,7 @@ int kb_receive(int halt) {
     int c = 0;
     if (scancode < 128)
         c = IS SHIFT ? keymap_shift[scancode] : keymap[scancode];
-    if (c == 'D' && IS CTRL)
+    if (c == 'E' && IS CTRL)
         c = -1; // EOF
     scancode = 0;
     return c;
