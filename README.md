@@ -15,7 +15,7 @@ A hobby 32-bit OS made for self-learning from scratch.
 
 ## What it uses:
 - Legacy Grub - bootloader
-- Kor - my own kernel (It now has a name). Why I chose kor? It looks almost like the word core, and in Hebrew
+- Kor - my own kernel (It now has a name). Why I chose Kor? It looks almost like the word core, and in Hebrew
 (קור) means cold, frost.
 
 ## What it can do:
