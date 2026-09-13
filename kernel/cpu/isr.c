@@ -145,11 +145,13 @@ void irq_handler(registers_t *r) {
 #include <kor/clock/pit.h>
 #include <kor/clock/rtc.h>
 #include <kor/input/ps2_keyboard.h>
+#include <kor/input/ps2_mouse.h>
 
 void irq_install() {
     asm volatile("sti");
     pit_init(1000); // IRQ0 - PIT
     kb_init();      // IRQ1 - keyboard
     rtc_init(0x06); // IRQ8 - rtc
+    mouse_init();   // IRQ12 - mouse
     // install_isr99();  FIXME: Should be in isr_install...
 }
