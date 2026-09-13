@@ -1,6 +1,6 @@
-#include "ata.h"
-#include "../../cpu/ports.h"
-#include "../../kernel/debug.h"
+#include <kor/debug.h>
+#include <kor/ll/port.h>
+#include <kor/storage/ata.h>
 
 #define ata_trace(fmt, ...) trace("[ATA] " fmt, ##__VA_ARGS__)
 
@@ -43,20 +43,20 @@
 
 #define ERR_ABRT (1u << 2)
 
-void ata_400ns_delay(uint16_t io_base, uint16_t ct_base) {
+void ata_400ns_delay(u16 io_base, u16 ct_base) {
     for (int i = 0; i < 15; ++i) {
         if (i % 2 == 0) {
-            (volatile void)port_byte_in(io_base + STATUS_REG);
+            (volatile void)inb(io_base + STATUS_REG);
         } else {
-            (volatile void)port_byte_in(ct_base + ALT_STATUS_REG);
+            (volatile void)inb(ct_base + ALT_STATUS_REG);
         }
     }
 }
 
-int ata_wait_bsy(uint16_t io_base) {
-    uint8_t status;
+int ata_wait_bsy(u16 io_base) {
+    u8 status;
     for (int i = 0; i < ATTEMPTS; ++i) {
-        status = port_byte_in(io_base + STATUS_REG);
+        status = inb(io_base + STATUS_REG);
         if (!(status & STATUS_BSY))
             return 1;
     }
@@ -65,9 +65,9 @@ int ata_wait_bsy(uint16_t io_base) {
 }
 
 int ata_wait_drq(ata_drive_t *drive) {
-    uint8_t status;
+    u8 status;
     for (int i = 0; i < ATTEMPTS; ++i) {
-        status = port_byte_in(drive->io_base + STATUS_REG);
+        status = inb(drive->io_base + STATUS_REG);
         if (status & STATUS_ERR) {
             ata_trace("Received an error.");
             return 0;
@@ -83,55 +83,55 @@ int ata_wait_drq(ata_drive_t *drive) {
     return 0;
 }
 
-int ata_software_reset(uint16_t io_base, uint16_t ct_base) {
-    port_byte_out(ct_base + DEV_CT_REG, 0x04);
-    port_byte_out(ct_base + DEV_CT_REG, 0x00); // Clear SRST
+int ata_software_reset(u16 io_base, u16 ct_base) {
+    outb(ct_base + DEV_CT_REG, 0x04);
+    outb(ct_base + DEV_CT_REG, 0x00); // Clear SRST
 
     return ata_wait_bsy(io_base);
 }
 
 void ata_select_drive(ata_drive_t *drive) {
-    uint8_t drv = drive->flags & (1u << 0) ? SLAVE : MASTER;
-    port_byte_out(drive->io_base + DRV_HEAD_REG, drv);
+    u8 drv = drive->flags & (1u << 0) ? SLAVE : MASTER;
+    outb(drive->io_base + DRV_HEAD_REG, drv);
     ata_400ns_delay(drive->io_base, drive->ct_base);
 }
 
-int ata_identify(uint8_t secondary, uint8_t slave, ata_drive_t *drive) {
-    uint16_t io_base = secondary ? SECONDARY_IO_BASE : PRIMARY_IO_BASE;
-    uint16_t ct_base = secondary ? SECONDARY_CT_BASE : PRIMARY_CT_BASE;
-    uint8_t drv = slave ? SLAVE : MASTER;
+int ata_identify(u8 secondary, u8 slave, ata_drive_t *drive) {
+    u16 io_base = secondary ? SECONDARY_IO_BASE : PRIMARY_IO_BASE;
+    u16 ct_base = secondary ? SECONDARY_CT_BASE : PRIMARY_CT_BASE;
+    u8 drv = slave ? SLAVE : MASTER;
 
     if (!ata_software_reset(io_base, ct_base))
         return -1;
 
     // Select drive
-    port_byte_out(io_base + DRV_HEAD_REG, drv);
+    outb(io_base + DRV_HEAD_REG, drv);
     ata_400ns_delay(io_base, ct_base);
 
     // Set count to 0
-    port_byte_out(io_base + SECT_CNT_REG, 0);
+    outb(io_base + SECT_CNT_REG, 0);
     // Set LBAlo, LBAmid, LBAhi to 0
-    port_byte_out(io_base + LBA_LO_REG, 0);
-    port_byte_out(io_base + LBA_MID_REG, 0);
-    port_byte_out(io_base + LBA_HI_REG, 0);
+    outb(io_base + LBA_LO_REG, 0);
+    outb(io_base + LBA_MID_REG, 0);
+    outb(io_base + LBA_HI_REG, 0);
 
     // IDENTIFY
-    port_byte_out(io_base + CMD_REG, IDENTIFY);
+    outb(io_base + CMD_REG, IDENTIFY);
 
-    uint8_t status = port_byte_in(io_base + STATUS_REG);
+    u8 status = inb(io_base + STATUS_REG);
     if (status == 0) {
         return 1; // No drive
     }
 
-    uint8_t is_ata = 1;
+    u8 is_ata = 1;
 
-    uint32_t i;
+    u32 i;
     // BSY
-    for (i = 0; i < ATTEMPTS &&
-                (status = port_byte_in(io_base + STATUS_REG) & STATUS_BSY);
+    for (i = 0;
+         i < ATTEMPTS && (status = inb(io_base + STATUS_REG) & STATUS_BSY);
          ++i) {
-        uint8_t lba_mid = port_byte_in(io_base + LBA_MID_REG);
-        uint8_t lba_hi = port_byte_in(io_base + LBA_HI_REG);
+        u8 lba_mid = inb(io_base + LBA_MID_REG);
+        u8 lba_hi = inb(io_base + LBA_HI_REG);
 
         // Non-ATA drive
         if (lba_mid != 0 || lba_hi != 0) {
@@ -144,12 +144,12 @@ int ata_identify(uint8_t secondary, uint8_t slave, ata_drive_t *drive) {
         return -1;
     }
 
-    uint8_t atapi, sata;
+    u8 atapi, sata;
     atapi = sata = 0;
 
     if (!is_ata) {
-        uint8_t lba_mid = port_byte_in(io_base + LBA_MID_REG);
-        uint8_t lba_hi = port_byte_in(io_base + LBA_HI_REG);
+        u8 lba_mid = inb(io_base + LBA_MID_REG);
+        u8 lba_hi = inb(io_base + LBA_HI_REG);
 
         // ATAPI
         if (lba_mid == 0x14 && lba_hi == 0xEB)
@@ -162,11 +162,11 @@ int ata_identify(uint8_t secondary, uint8_t slave, ata_drive_t *drive) {
 
     // DRQ / ERR
     for (i = 0; i < ATTEMPTS; ++i) {
-        status = port_byte_in(io_base + STATUS_REG);
+        status = inb(io_base + STATUS_REG);
         if (status & STATUS_DRQ)
             break;
         if (status & STATUS_ERR) {
-            if (port_byte_in(io_base + ERR_REG) & ERR_ABRT) { // ATAPI
+            if (inb(io_base + ERR_REG) & ERR_ABRT) { // ATAPI
                 // TODO: Run ATAPI IDENTIFY PACKET DEVICE
             } else
                 return 2; // ERR
@@ -178,7 +178,7 @@ int ata_identify(uint8_t secondary, uint8_t slave, ata_drive_t *drive) {
     }
 
     for (int i = 0; i < 256; ++i)
-        drive->identify_vals[i] = port_word_in(io_base + DATA_REG);
+        drive->identify_vals[i] = inw(io_base + DATA_REG);
     drive->io_base = io_base;
     drive->ct_base = ct_base;
     drive->flags |= ((slave ? 1 : 0) << 0);
@@ -196,7 +196,7 @@ int ata_identify(uint8_t secondary, uint8_t slave, ata_drive_t *drive) {
 }
 
 // https://read.seas.harvard.edu/cs161/2019/pdf/ata-atapi-8.pdf#M6.9.67214.Head2.329.ATA.string.convention
-void ata_str_to_c(char *dest, const uint16_t *src, int words) {
+void ata_str_to_c(char *dest, const u16 *src, int words) {
     for (int i = 0; i < words; ++i) {
         dest[i * 2] = (char)(src[i] >> 8);
         dest[i * 2 + 1] = (char)(src[i] & 0xFF);
@@ -210,25 +210,23 @@ void ata_str_to_c(char *dest, const uint16_t *src, int words) {
 }
 
 // If 0, LBA28 isn't supported
-uint32_t ata_get_lba28_sects(ata_drive_t *drive) {
-    uint32_t result =
-        (uint32_t)drive->identify_vals[61] << 16 | drive->identify_vals[60];
+u32 ata_get_lba28_sects(ata_drive_t *drive) {
+    u32 result = (u32)drive->identify_vals[61] << 16 | drive->identify_vals[60];
     return result;
 }
 
 // If 0, LBA48 isn't supported
-uint64_t ata_get_lba48_sects(ata_drive_t *drive) {
+u64 ata_get_lba48_sects(ata_drive_t *drive) {
     if (drive->identify_vals[83] & (1u << 10)) {
-        uint64_t result = (uint64_t)drive->identify_vals[103] << 48 |
-                          (uint64_t)drive->identify_vals[102] << 32 |
-                          (uint64_t)drive->identify_vals[101] << 16 |
-                          drive->identify_vals[100];
+        u64 result = (u64)drive->identify_vals[103] << 48 |
+                     (u64)drive->identify_vals[102] << 32 |
+                     (u64)drive->identify_vals[101] << 16 |
+                     drive->identify_vals[100];
     }
     return 0;
 }
 
-int ata_lba28_read(ata_drive_t *drive, uint32_t lba, uint8_t count,
-                   uint16_t *buffer) {
+int ata_lba28_read(ata_drive_t *drive, u32 lba, u8 count, u16 *buffer) {
     if (!buffer) {
         ata_trace("Buffer is null.");
         return 0;
@@ -237,7 +235,7 @@ int ata_lba28_read(ata_drive_t *drive, uint32_t lba, uint8_t count,
         ata_trace("Sector count is 0.");
         return 0;
     }
-    uint32_t total_sects = ata_get_lba28_sects(drive);
+    u32 total_sects = ata_get_lba28_sects(drive);
     if (lba >= total_sects) {
         ata_trace("LBA is more than total sectors.");
         return 0;
@@ -247,17 +245,16 @@ int ata_lba28_read(ata_drive_t *drive, uint32_t lba, uint8_t count,
         return 0;
     }
 
-    uint8_t slave = (drive->flags & 1u) ? (1u << 4) : 0;
-    port_byte_out(drive->io_base + DRV_HEAD_REG,
-                  0xE0 | slave | ((lba >> 24) & 0x0F));
+    u8 slave = (drive->flags & 1u) ? (1u << 4) : 0;
+    outb(drive->io_base + DRV_HEAD_REG, 0xE0 | slave | ((lba >> 24) & 0x0F));
 
-    port_byte_out(drive->io_base + SECT_CNT_REG, count);
+    outb(drive->io_base + SECT_CNT_REG, count);
 
-    port_byte_out(drive->io_base + LBA_LO_REG, (lba >> 0) & 0xFF);
-    port_byte_out(drive->io_base + LBA_MID_REG, (lba >> 8) & 0xFF);
-    port_byte_out(drive->io_base + LBA_HI_REG, (lba >> 16) & 0xFF);
+    outb(drive->io_base + LBA_LO_REG, (lba >> 0) & 0xFF);
+    outb(drive->io_base + LBA_MID_REG, (lba >> 8) & 0xFF);
+    outb(drive->io_base + LBA_HI_REG, (lba >> 16) & 0xFF);
 
-    port_byte_out(drive->io_base + CMD_REG, READ_SECTS);
+    outb(drive->io_base + CMD_REG, READ_SECTS);
     ata_400ns_delay(drive->io_base, drive->ct_base);
 
     for (int i = 0; i < count; ++i) {
@@ -265,20 +262,19 @@ int ata_lba28_read(ata_drive_t *drive, uint32_t lba, uint8_t count,
             return 0;
 
         for (int j = 0; j < 256; ++j)
-            *buffer++ = port_word_in(drive->io_base + DATA_REG);
+            *buffer++ = inw(drive->io_base + DATA_REG);
         ata_400ns_delay(drive->io_base, drive->ct_base);
     }
 
     return 1;
 }
 
-int ata_cache_flush(uint16_t io_base) {
-    port_byte_out(io_base + CMD_REG, CACHE_FLUSH);
+int ata_cache_flush(u16 io_base) {
+    outb(io_base + CMD_REG, CACHE_FLUSH);
     return ata_wait_bsy(io_base);
 }
 
-int ata_lba28_write(ata_drive_t *drive, uint32_t lba, uint8_t count,
-                    uint16_t *buffer) {
+int ata_lba28_write(ata_drive_t *drive, u32 lba, u8 count, u16 *buffer) {
     if (!buffer) {
         ata_trace("Buffer is null.");
         return 0;
@@ -287,7 +283,7 @@ int ata_lba28_write(ata_drive_t *drive, uint32_t lba, uint8_t count,
         ata_trace("Sector count is 0.");
         return 0;
     }
-    uint32_t total_sects = ata_get_lba28_sects(drive);
+    u32 total_sects = ata_get_lba28_sects(drive);
     if (lba >= total_sects) {
         ata_trace("LBA is more than total sectors.");
         return 0;
@@ -297,17 +293,16 @@ int ata_lba28_write(ata_drive_t *drive, uint32_t lba, uint8_t count,
         return 0;
     }
 
-    uint8_t slave = (drive->flags & 1u) ? (1u << 4) : 0;
-    port_byte_out(drive->io_base + DRV_HEAD_REG,
-                  0xE0 | slave | ((lba >> 24) & 0x0F));
+    u8 slave = (drive->flags & 1u) ? (1u << 4) : 0;
+    outb(drive->io_base + DRV_HEAD_REG, 0xE0 | slave | ((lba >> 24) & 0x0F));
 
-    port_byte_out(drive->io_base + SECT_CNT_REG, count);
+    outb(drive->io_base + SECT_CNT_REG, count);
 
-    port_byte_out(drive->io_base + LBA_LO_REG, (lba >> 0) & 0xFF);
-    port_byte_out(drive->io_base + LBA_MID_REG, (lba >> 8) & 0xFF);
-    port_byte_out(drive->io_base + LBA_HI_REG, (lba >> 16) & 0xFF);
+    outb(drive->io_base + LBA_LO_REG, (lba >> 0) & 0xFF);
+    outb(drive->io_base + LBA_MID_REG, (lba >> 8) & 0xFF);
+    outb(drive->io_base + LBA_HI_REG, (lba >> 16) & 0xFF);
 
-    port_byte_out(drive->io_base + CMD_REG, WRITE_SECTS);
+    outb(drive->io_base + CMD_REG, WRITE_SECTS);
     ata_400ns_delay(drive->io_base, drive->ct_base);
 
     for (int i = 0; i < count; ++i) {
@@ -315,14 +310,13 @@ int ata_lba28_write(ata_drive_t *drive, uint32_t lba, uint8_t count,
             return 0;
 
         for (int j = 0; j < 256; ++j)
-            port_word_out(drive->io_base + DATA_REG, *buffer++);
+            outw(drive->io_base + DATA_REG, *buffer++);
         ata_400ns_delay(drive->io_base, drive->ct_base);
     }
     return ata_cache_flush(drive->io_base);
 }
 
-int ata_lba48_read(ata_drive_t *drive, uint64_t lba, uint16_t count,
-                   uint16_t *buffer) {
+int ata_lba48_read(ata_drive_t *drive, u64 lba, u16 count, u16 *buffer) {
     if (!buffer) {
         ata_trace("Buffer is null.");
         return 0;
@@ -331,7 +325,7 @@ int ata_lba48_read(ata_drive_t *drive, uint64_t lba, uint16_t count,
         ata_trace("Sector count is 0.");
         return 0;
     }
-    uint64_t total_sects = ata_get_lba48_sects(drive);
+    u64 total_sects = ata_get_lba48_sects(drive);
     if (lba >= total_sects) {
         ata_trace("LBA is more than total sectors.");
         return 0;
@@ -341,24 +335,23 @@ int ata_lba48_read(ata_drive_t *drive, uint64_t lba, uint16_t count,
         return 0;
     }
 
-    uint8_t slave = (drive->flags & 1u) ? (1u << 4) : 0;
-    port_byte_out(drive->io_base + DRV_HEAD_REG,
-                  0xE0 | slave | ((lba >> 24) & 0x0F));
+    u8 slave = (drive->flags & 1u) ? (1u << 4) : 0;
+    outb(drive->io_base + DRV_HEAD_REG, 0xE0 | slave | ((lba >> 24) & 0x0F));
 
-    port_byte_out(drive->io_base + SECT_CNT_REG, count >> 8);
+    outb(drive->io_base + SECT_CNT_REG, count >> 8);
 
-    uint8_t *lba_bytes = (uint8_t *)&lba;
-    port_byte_out(drive->io_base + LBA_LO_REG, lba_bytes[3]);
-    port_byte_out(drive->io_base + LBA_MID_REG, lba_bytes[4]);
-    port_byte_out(drive->io_base + LBA_HI_REG, lba_bytes[5]);
+    u8 *lba_bytes = (u8 *)&lba;
+    outb(drive->io_base + LBA_LO_REG, lba_bytes[3]);
+    outb(drive->io_base + LBA_MID_REG, lba_bytes[4]);
+    outb(drive->io_base + LBA_HI_REG, lba_bytes[5]);
 
-    port_byte_out(drive->io_base + SECT_CNT_REG, count & 0x00FF);
+    outb(drive->io_base + SECT_CNT_REG, count & 0x00FF);
 
-    port_byte_out(drive->io_base + LBA_LO_REG, lba_bytes[0]);
-    port_byte_out(drive->io_base + LBA_MID_REG, lba_bytes[1]);
-    port_byte_out(drive->io_base + LBA_HI_REG, lba_bytes[2]);
+    outb(drive->io_base + LBA_LO_REG, lba_bytes[0]);
+    outb(drive->io_base + LBA_MID_REG, lba_bytes[1]);
+    outb(drive->io_base + LBA_HI_REG, lba_bytes[2]);
 
-    port_byte_out(drive->io_base + CMD_REG, READ_SECTS_EX);
+    outb(drive->io_base + CMD_REG, READ_SECTS_EX);
     ata_400ns_delay(drive->io_base, drive->ct_base);
 
     for (int i = 0; i < count; ++i) {
@@ -366,14 +359,13 @@ int ata_lba48_read(ata_drive_t *drive, uint64_t lba, uint16_t count,
             return 0;
 
         for (int j = 0; j < 256; ++j)
-            *buffer++ = port_word_in(drive->io_base + DATA_REG);
+            *buffer++ = inw(drive->io_base + DATA_REG);
         ata_400ns_delay(drive->io_base, drive->ct_base);
     }
     return 1;
 }
 
-int ata_lba48_write(ata_drive_t *drive, uint64_t lba, uint16_t count,
-                    uint16_t *buffer) {
+int ata_lba48_write(ata_drive_t *drive, u64 lba, u16 count, u16 *buffer) {
     if (!buffer) {
         ata_trace("Buffer is null.");
         return 0;
@@ -382,7 +374,7 @@ int ata_lba48_write(ata_drive_t *drive, uint64_t lba, uint16_t count,
         ata_trace("Sector count is 0.");
         return 0;
     }
-    uint64_t total_sects = ata_get_lba48_sects(drive);
+    u64 total_sects = ata_get_lba48_sects(drive);
     if (lba >= total_sects) {
         ata_trace("LBA is more than total sectors.");
         return 0;
@@ -392,24 +384,23 @@ int ata_lba48_write(ata_drive_t *drive, uint64_t lba, uint16_t count,
         return 0;
     }
 
-    uint8_t slave = (drive->flags & 1u) ? (1u << 4) : 0;
-    port_byte_out(drive->io_base + DRV_HEAD_REG,
-                  0xE0 | slave | ((lba >> 24) & 0x0F));
+    u8 slave = (drive->flags & 1u) ? (1u << 4) : 0;
+    outb(drive->io_base + DRV_HEAD_REG, 0xE0 | slave | ((lba >> 24) & 0x0F));
 
-    port_byte_out(drive->io_base + SECT_CNT_REG, count >> 8);
+    outb(drive->io_base + SECT_CNT_REG, count >> 8);
 
-    uint8_t *lba_bytes = (uint8_t *)&lba;
-    port_byte_out(drive->io_base + LBA_LO_REG, lba_bytes[3]);
-    port_byte_out(drive->io_base + LBA_MID_REG, lba_bytes[4]);
-    port_byte_out(drive->io_base + LBA_HI_REG, lba_bytes[5]);
+    u8 *lba_bytes = (u8 *)&lba;
+    outb(drive->io_base + LBA_LO_REG, lba_bytes[3]);
+    outb(drive->io_base + LBA_MID_REG, lba_bytes[4]);
+    outb(drive->io_base + LBA_HI_REG, lba_bytes[5]);
 
-    port_byte_out(drive->io_base + SECT_CNT_REG, count & 0x00FF);
+    outb(drive->io_base + SECT_CNT_REG, count & 0x00FF);
 
-    port_byte_out(drive->io_base + LBA_LO_REG, lba_bytes[0]);
-    port_byte_out(drive->io_base + LBA_MID_REG, lba_bytes[1]);
-    port_byte_out(drive->io_base + LBA_HI_REG, lba_bytes[2]);
+    outb(drive->io_base + LBA_LO_REG, lba_bytes[0]);
+    outb(drive->io_base + LBA_MID_REG, lba_bytes[1]);
+    outb(drive->io_base + LBA_HI_REG, lba_bytes[2]);
 
-    port_byte_out(drive->io_base + CMD_REG, READ_SECTS_EX);
+    outb(drive->io_base + CMD_REG, READ_SECTS_EX);
     ata_400ns_delay(drive->io_base, drive->ct_base);
 
     for (int i = 0; i < count; ++i) {
@@ -417,16 +408,16 @@ int ata_lba48_write(ata_drive_t *drive, uint64_t lba, uint16_t count,
             return 0;
 
         for (int j = 0; j < 256; ++j)
-            port_word_out(drive->io_base + DATA_REG, *buffer++);
+            outw(drive->io_base + DATA_REG, *buffer++);
         ata_400ns_delay(drive->io_base, drive->ct_base);
     }
     return ata_cache_flush(drive->io_base);
 }
 
-uint8_t ata_perform_device_diagnostics(ata_drive_t *drive) {
+u8 ata_perform_device_diagnostics(ata_drive_t *drive) {
     ata_select_drive(drive);
-    port_byte_out(drive->io_base + CMD_REG, DEVICE_DIAG);
-    while (port_byte_in(drive->io_base + STATUS_REG) & (1u << 7))
+    outb(drive->io_base + CMD_REG, DEVICE_DIAG);
+    while (inb(drive->io_base + STATUS_REG) & (1u << 7))
         asm volatile("hlt");
-    return port_byte_in(drive->io_base + ERR_REG);
+    return inb(drive->io_base + ERR_REG);
 }
