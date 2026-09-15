@@ -3,7 +3,7 @@
 #include <kor/ll/isr.h>
 #include <kor/types.h>
 
-static mouse_event_t current_event;
+static volatile mouse_event_t current_event = (void *)0;
 
 void mouse_wait(int write) {
     u32 timeout = 100000;
@@ -14,7 +14,7 @@ void mouse_wait(int write) {
                 return;
     } else {
         while (timeout--)
-            if (!(ps2_status_read() & 1))
+            if (ps2_status_read() & 1)
                 return;
     }
 }
@@ -35,7 +35,14 @@ void mouse_callback(registers_t *regs) {
     (void)regs;
     u8 packets[4];
     for (int i = 0; i < 3; ++i)
-        packets[i] = ps2_data_read();
+        packets[i] = mouse_read();
+    if (packets[0] & 0x40 || packets[0] & 0x80)
+        return;
+    if (!(packets[0] & 8))
+        return;
+    i16 x, y;
+    x = (i16)(u8)packets[1];
+    y = (i16)(u8)packets[2];
     if (current_event != (void *)0) {
         u8 buttons = 0;
         if (packets[0] & 1)
@@ -44,20 +51,31 @@ void mouse_callback(registers_t *regs) {
             buttons |= 2; // MMB
         if (packets[0] & 2)
             buttons |= 4; // RMB
-        i16 x = packets[1];
-        i16 y = packets[2];
         if (packets[0] & 16)
-            x = -x;
+            x -= 256;
         if (packets[0] & 32)
-            y = -y;
+            y -= 256;
         current_event(x, y, buttons);
     }
 }
 
 void mouse_set_event(mouse_event_t event) { current_event = event; }
 
+void ps2_flush_output_buffer() {
+    while (ps2_status_read() & 1)
+        (void)inb(0x60);
+}
+
 void mouse_init() {
     register_interrupt_handler(IRQ12, mouse_callback);
+
+    mouse_wait(1);
+    ps2_command_write(0xAD);
+    mouse_wait(1);
+    ps2_command_write(0xA7);
+
+    ps2_flush_output_buffer();
+
     // enable aux mouse
     mouse_wait(1);
     ps2_command_write(0xA8);
@@ -69,10 +87,15 @@ void mouse_init() {
     u8 in = ps2_data_read();
     in |= 2;
     in &= ~0x20;
+    in |= 1;
+    in &= ~0x10;
     mouse_wait(1);
     ps2_command_write(0x60);
     mouse_wait(1);
     ps2_data_write(in);
+    // Enable keyboard
+    mouse_wait(1);
+    ps2_command_write(0xAE);
 
     // set defaults
     mouse_write(0xF6);
