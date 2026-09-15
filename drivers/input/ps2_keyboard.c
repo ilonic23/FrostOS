@@ -67,7 +67,6 @@ void kb_callback(registers_t *regs) {
 
     if (byte == 0xE0) {
         expect_ex = 1;
-        outb(0x20, 0x20); // End of interrupt
         return;
     }
 
@@ -97,8 +96,6 @@ void kb_callback(registers_t *regs) {
 
     if (IS CAPS) // toggle CapsLock led
         ps2_kb_send_cmd(0xED, 0b00000100);
-
-    outb(0x20, 0x20);
 }
 
 void kb_init() { register_interrupt_handler(IRQ1, kb_callback); }
