@@ -1,3 +1,4 @@
+#include <kor/boot/multiboot.h>
 #include <kor/output/display.h>
 #include <kor/output/vesa_fb.h>
 #include <kor/output/vga.h>
