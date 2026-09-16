@@ -125,6 +125,8 @@ typedef struct __attribute__((packed)) {
 
 u16 pci_config_read_word(u8 bus, u8 slot, u8 func, u8 offset);
 u32 pci_config_read_dword(u8 bus, u8 slot, u8 func, u8 offset);
+void pci_config_write_word(u8 bus, u8 slot, u8 func, u8 offset, u16 value);
+void pci_config_write_dword(u8 bus, u8 slot, u8 func, u8 offset, u32 value);
 u16 pci_get_vendor(u8 bus, u8 slot);
 u16 pci_get_device(u8 bus, u8 slot);
 u8 pci_get_class_code(u8 bus, u8 slot);

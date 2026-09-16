@@ -32,6 +32,20 @@ u32 pci_config_read_dword(u8 bus, u8 slot, u8 func, u8 offset) {
     return inl(0xCFC);
 }
 
+void pci_config_write_word(u8 bus, u8 slot, u8 func, u8 offset, u16 value) {
+    u32 addr = (1u << 31) | ((u32)bus << 16) | ((u32)slot << 11) |
+               ((u32)func << 8) | (offset & 0xFC);
+    outl(0xCF8, addr);
+    outl(0xCFC + (offset & 2), value);
+}
+
+void pci_config_write_dword(u8 bus, u8 slot, u8 func, u8 offset, u32 value) {
+    u32 addr = (1u << 31) | ((u32)bus << 16) | ((u32)slot << 11) |
+               ((u32)func << 8) | (offset & 0xFC);
+    outl(0xCF8, addr);
+    outl(0xCFC, value);
+}
+
 // 0xFFFF - invalid vendor - non-existent device
 u16 pci_get_vendor(u8 bus, u8 slot) {
     return pci_config_read_word(bus, slot, 0, 0);
