@@ -1,3 +1,4 @@
+global check_cpuid
 check_cpuid:
     pushfd                      ; Save original EFLAGS
     pushfd                      ; Copy of original EFLAGS
